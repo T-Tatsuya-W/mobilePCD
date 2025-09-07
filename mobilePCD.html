@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Mic → PCD (Ring)</title>
+<style>
+  :root { color-scheme: dark light; }
+  * { box-sizing: border-box; }
+  body{
+    margin:0; padding:12px; font-family: system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    display:grid; gap:12px; min-height:100svh; grid-template-rows:auto 1fr auto;
+  }
+  header, footer{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  button{
+    padding:12px 14px; border-radius:12px; border:1px solid #888; background:transparent; cursor:pointer;
+    touch-action:manipulation;
+  }
+  #status{ opacity:.8 }
+  .canvas-wrap{
+    display:grid; place-items:center; width:100%; height:100%;
+  }
+  canvas{
+    max-width: min(100%, 720px);
+    max-height: min(100%, 720px);
+    width: 100%;
+    height: auto;
+    touch-action:none; /* so we can rotate with drag on mobile */
+    border-radius: 16px;
+    border: 1px dashed #888;
+    background: transparent;
+  }
+  code{ background:#0001; padding:3px 6px; border-radius:6px }
+</style>
+</head>
+<body>
+  <header>
+    <button id="start">Start mic</button>
+    <button id="stop" disabled>Stop</button>
+    <button id="resetRot" title="Reset ring rotation">Reset ring</button>
+    <span id="status">Idle</span>
+  </header>
+
+  <div class="canvas-wrap">
+    <canvas id="ring"></canvas>
+  </div>
+
+  <footer>
+    <div><strong>PCD (C..B):</strong> <code id="pcdText">[0,0,0,0,0,0,0,0,0,0,0,0]</code></div>
+  </footer>
+
+<script type="module">
+  // =========================
+  // ====== CONFIG HERE ======
+  // =========================
+  const WINDOW_SIZE = 4096;   // FFT window (power of 2): 2048, 4096, 8192...
+  const HOP_SIZE    = 1024;   // analysis hop in samples
+  const MIN_HZ      = 50;     // ignore rumble below
+  const MAX_HZ      = 5000;   // ignore hiss above
+  const REF_A4      = 440;    // tuning reference
+  const SMOOTHING   = 0.6;    // 0=no smoothing, 0.9=very smooth
+  const RING = {
+    innerRadiusRatio: 0.38,   // inner radius (as fraction of canvas min/2)
+    outerRadiusRatio: 0.95,   // outer radius (as fraction of canvas min/2)
+    labelRadiusRatio: 0.30,   // where to place note labels
+    gapRadians: 0.04,         // small gap between slices for readability
+    baseRotation: -Math.PI/2, // start with C at top (12 o'clock)
+  };
+  // =========================
+
+  // ===== Utilities =====
+  const hann = (N) => {
+    const w = new Float32Array(N), t = 2*Math.PI/(N-1);
+    for (let n=0;n<N;n++) w[n] = 0.5*(1-Math.cos(t*n));
+    return w;
+  };
+
+  function fftReal(signal){
+    let N=1; while (N<signal.length) N<<=1;
+    const re = new Float32Array(N), im = new Float32Array(N);
+    re.set(signal);
+    let j=0;
+    for (let i=1;i<N;i++){
+      let bit=N>>1;
+      for(; j & bit; bit>>=1) j^=bit;
+      j^=bit;
+      if(i<j){ [re[i],re[j]]=[re[j],re[i]]; [im[i],im[j]]=[im[j],im[i]]; }
+    }
+    for (let len=2; len<=N; len<<=1){
+      const ang=-2*Math.PI/len;
+      const wlenRe=Math.cos(ang), wlenIm=Math.sin(ang);
+      for(let i=0;i<N;i+=len){
+        let wRe=1,wIm=0;
+        for(let k=0;k<len/2;k++){
+          const uRe=re[i+k], uIm=im[i+k];
+          const vRe=re[i+k+len/2]*wRe - im[i+k+len/2]*wIm;
+          const vIm=re[i+k+len/2]*wIm + im[i+k+len/2]*wRe;
+          re[i+k]=uRe+vRe;       im[i+k]=uIm+vIm;
+          re[i+k+len/2]=uRe-vRe; im[i+k+len/2]=uIm-vIm;
+          const nwRe=wRe*wlenRe - wIm*wlenIm;
+          const nwIm=wRe*wlenIm + wIm*wlenRe;
+          wRe=nwRe; wIm=nwIm;
+        }
+      }
+    }
+    const mags = new Float32Array(N/2);
+    for (let i=0;i<N/2;i++) mags[i]=Math.hypot(re[i],im[i]);
+    return mags;
+  }
+
+  function spectrumToPCD(mags, sampleRate, a4=440, minHz=50, maxHz=5000){
+    const pcd = new Float32Array(12);
+    const binHz = sampleRate/(mags.length*2);
+    const minBin = Math.max(1, Math.floor(minHz/binHz));
+    const maxBin = Math.min(mags.length-1, Math.floor(maxHz/binHz));
+    for (let k=minBin;k<=maxBin;k++){
+      const f = k*binHz;
+      const midi = 69 + 12*Math.log2(f/a4);
+      const pc = ((Math.round(midi)%12)+12)%12;
+      const w = mags[k]*mags[k];
+      pcd[pc]+=w;
+    }
+    let sum=0; for (let i=0;i<12;i++) sum+=pcd[i];
+    if (sum>0) for (let i=0;i<12;i++) pcd[i]/=sum;
+    return pcd;
+  }
+
+  // ===== DOM / Canvas =====
+  const startBtn = document.getElementById('start');
+  const stopBtn  = document.getElementById('stop');
+  const resetRot = document.getElementById('resetRot');
+  const statusEl = document.getElementById('status');
+  const pcdText  = document.getElementById('pcdText');
+  const canvas   = document.getElementById('ring');
+  const ctx      = canvas.getContext('2d', { alpha: true });
+
+  // DPR-aware resize to keep canvas crisp
+  function fitCanvas(){
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const cssSize = canvas.getBoundingClientRect();
+    canvas.width  = Math.round(cssSize.width * dpr);
+    canvas.height = Math.round(cssSize.height * dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0); // draw in CSS pixels
+  }
+  // ensure a nice square area (CSS handles aspect; we just fit the backing store)
+  const ro = new ResizeObserver(fitCanvas); ro.observe(canvas);
+
+  // ===== Ring draw =====
+  const NOTE_LABELS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  let userRotation = 0; // radians, additive to baseRotation
+
+  function drawRing(pcd){
+    const { width, height } = canvas.getBoundingClientRect();
+    const cx = width/2, cy = height/2;
+    const rMin = Math.min(width, height)/2;
+    const rInner = rMin * RING.innerRadiusRatio;
+    const rOuter = rMin * RING.outerRadiusRatio;
+    const rLabel = rMin * RING.labelRadiusRatio;
+
+    ctx.clearRect(0,0,width,height);
+
+    // background guide ring
+    ctx.beginPath();
+    ctx.arc(cx, cy, (rInner+rOuter)/2, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(127,127,127,0.4)';
+    ctx.setLineDash([4,4]);
+    ctx.lineWidth = rOuter - rInner;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    const full = Math.PI*2;
+    const slice = full/12;
+    const gap = Math.min(RING.gapRadians, slice*0.3); // limit gap
+
+    // draw each pitch-class as a radial wedge whose length == pcd[i]
+    for (let i=0;i<12;i++){
+      const value = pcd[i]; // 0..1
+      const startA = RING.baseRotation + userRotation + i*slice + gap/2;
+      const endA   = startA + slice - gap;
+
+      const rVal = rInner + value * (rOuter - rInner);
+      // Fill the active magnitude wedge
+      ctx.beginPath();
+      // outer arc (value)
+      ctx.arc(cx, cy, rVal, startA, endA);
+      // inner arc (reverse)
+      ctx.arc(cx, cy, rInner, endA, startA, true);
+      ctx.closePath();
+      ctx.fillStyle = 'currentColor'; // picks up foreground color from theme
+      ctx.globalAlpha = 0.9;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // thin outline for the full slot
+      ctx.beginPath();
+      ctx.arc(cx, cy, rOuter, startA, endA);
+      ctx.arc(cx, cy, rInner, endA, startA, true);
+      ctx.closePath();
+      ctx.strokeStyle = 'rgba(127,127,127,0.5)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // label
+      const mid = (startA+endA)/2;
+      const lx = cx + Math.cos(mid)*rLabel;
+      const ly = cy + Math.sin(mid)*rLabel + 4; // slight baseline offset
+      ctx.font = '13px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'currentColor';
+      ctx.fillText(NOTE_LABELS[i], lx, ly);
+    }
+  }
+
+  // ===== Rotate with drag (touch or mouse) =====
+  let dragging = false, lastAngle = 0;
+  function pointAngle(evt){
+    const rect = canvas.getBoundingClientRect();
+    const x = (evt.clientX ?? evt.touches?.[0]?.clientX) - rect.left;
+    const y = (evt.clientY ?? evt.touches?.[0]?.clientY) - rect.top;
+    const cx = rect.width/2, cy = rect.height/2;
+    return Math.atan2(y - cy, x - cx);
+  }
+  function onPointerDown(e){
+    e.preventDefault();
+    dragging = true;
+    lastAngle = pointAngle(e);
+    canvas.setPointerCapture?.(e.pointerId ?? 0);
+  }
+  function onPointerMove(e){
+    if (!dragging) return;
+    const a = pointAngle(e);
+    const delta = a - lastAngle;
+    lastAngle = a;
+    userRotation += delta;
+    drawRing(window.currentPCD);
+  }
+  function onPointerUp(e){
+    dragging = false;
+    canvas.releasePointerCapture?.(e.pointerId ?? 0);
+  }
+  // Support both Pointer Events and fallback to touch/mouse
+  if ('onpointerdown' in window){
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerup', onPointerUp);
+    canvas.addEventListener('pointercancel', onPointerUp);
+  } else {
+    canvas.addEventListener('mousedown', onPointerDown);
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', onPointerUp);
+    canvas.addEventListener('touchstart', onPointerDown, {passive:false});
+    window.addEventListener('touchmove', onPointerMove, {passive:false});
+    window.addEventListener('touchend', onPointerUp);
+    window.addEventListener('touchcancel', onPointerUp);
+  }
+  resetRot.addEventListener('click', ()=>{ userRotation = 0; drawRing(window.currentPCD); });
+
+  // ===== Public hook for your AR torus =====
+  window.currentPCD = new Float32Array(12);
+  // window.addEventListener('pcd', e => { const pcd = e.detail; ... })
+
+  // ===== Audio + analysis =====
+  let audioContext, workletNode, micStream, running=false;
+  let sampleRate = 48000;
+
+  const workletURL = URL.createObjectURL(new Blob([`
+    class Tap extends AudioWorkletProcessor {
+      process(inputs){
+        const ch = inputs[0][0];
+        if (ch) this.port.postMessage(ch.slice(0));
+        return true;
+      }
+    }
+    registerProcessor('tap', Tap);
+  `], {type:'text/javascript'}));
+
+  async function start(){
+    if (running) return;
+    running = true; startBtn.disabled = true; stopBtn.disabled = false; statusEl.textContent = 'Starting…';
+
+    audioContext = new (window.AudioContext || window.webkitAudioContext)({latencyHint:'interactive'});
+    sampleRate = audioContext.sampleRate;
+    await audioContext.audioWorklet.addModule(workletURL);
+
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false },
+      video: false
+    });
+
+    const src = audioContext.createMediaStreamSource(micStream);
+    const silent = audioContext.createGain(); silent.gain.value = 0;
+    workletNode = new AudioWorkletNode(audioContext, 'tap');
+    src.connect(workletNode).connect(silent).connect(audioContext.destination);
+
+    const ringBuf = new Float32Array(WINDOW_SIZE);
+    const windowFn = hann(WINDOW_SIZE);
+    let writeIdx = 0, filled = 0, hopCount = 0;
+
+    workletNode.port.onmessage = (ev) => {
+      const frame = ev.data; // Float32Array(128)
+      for (let i=0;i<frame.length;i++){
+        ringBuf[writeIdx++] = frame[i];
+        if (writeIdx >= WINDOW_SIZE) writeIdx = 0;
+        if (filled < WINDOW_SIZE) filled++;
+        hopCount++;
+        if (hopCount >= HOP_SIZE && filled >= WINDOW_SIZE){
+          hopCount = 0;
+          analyze();
+        }
+      }
+    };
+
+    function analyze(){
+      // rebuild contiguous window
+      const start = writeIdx % WINDOW_SIZE;
+      const buf = new Float32Array(WINDOW_SIZE);
+      const first = ringBuf.subarray(start);
+      buf.set(first, 0);
+      buf.set(ringBuf.subarray(0, start), first.length);
+      // windowing
+      for (let i=0;i<WINDOW_SIZE;i++) buf[i] *= windowFn[i];
+      // FFT → PCD
+      const mags = fftReal(buf);
+      const pcd = spectrumToPCD(mags, sampleRate, REF_A4, MIN_HZ, MAX_HZ);
+      for (let i=0;i<12;i++){
+        window.currentPCD[i] = SMOOTHING*window.currentPCD[i] + (1-SMOOTHING)*pcd[i];
+      }
+      pcdText.textContent = '[' + Array.from(window.currentPCD).map(v=>v.toFixed(3)).join(', ') + ']';
+      drawRing(window.currentPCD);
+      window.dispatchEvent(new CustomEvent('pcd', {detail: window.currentPCD}));
+      statusEl.textContent = `Running @ ${sampleRate} Hz | N=${WINDOW_SIZE} hop=${HOP_SIZE}`;
+    }
+
+    // First paint
+    fitCanvas();
+    drawRing(window.currentPCD);
+  }
+
+  function stop(){
+    if (!running) return;
+    running = false; startBtn.disabled = false; stopBtn.disabled = true; statusEl.textContent = 'Stopped';
+    try { workletNode?.disconnect(); } catch {}
+    try { audioContext?.close(); } catch {}
+    try { micStream?.getTracks().forEach(t=>t.stop()); } catch {}
+  }
+
+  startBtn.addEventListener('click', start, { passive: true });
+  stopBtn.addEventListener('click', stop, { passive: true });
+
+  // Initial canvas setup
+  fitCanvas(); drawRing(new Float32Array(12));
+</script>
+</body>
+</html>

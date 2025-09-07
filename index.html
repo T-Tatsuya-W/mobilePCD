@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Mic → PCD (Ring)</title>
+<title>Mic → PCD (Ring, Mobile-friendly)</title>
 <style>
   :root { color-scheme: dark light; }
   * { box-sizing: border-box; }
@@ -17,17 +17,15 @@
     touch-action:manipulation;
   }
   #status{ opacity:.8 }
-  .canvas-wrap{
-    display:grid; place-items:center; width:100%; height:100%;
-  }
+  .canvas-wrap{ display:grid; place-items:center; width:100%; height:100%; }
   canvas{
     max-width: min(100%, 720px);
     max-height: min(100%, 720px);
     width: 100%;
     height: auto;
-    touch-action:none; /* so we can rotate with drag on mobile */
+    touch-action:none;
     border-radius: 16px;
-    border: 1px dashed #888;
+    border: 1px solid color-mix(in oklab, currentColor 30%, transparent);
     background: transparent;
   }
   code{ background:#0001; padding:3px 6px; border-radius:6px }
@@ -53,19 +51,26 @@
   // =========================
   // ====== CONFIG HERE ======
   // =========================
-  const WINDOW_SIZE = 4096;   // FFT window (power of 2): 2048, 4096, 8192...
-  const HOP_SIZE    = 1024;   // analysis hop in samples
-  const MIN_HZ      = 50;     // ignore rumble below
-  const MAX_HZ      = 5000;   // ignore hiss above
-  const REF_A4      = 440;    // tuning reference
-  const SMOOTHING   = 0.6;    // 0=no smoothing, 0.9=very smooth
+  const WINDOW_SIZE = 4096;   // FFT window (power of 2)
+  const HOP_SIZE    = 1024;   // analysis hop
+  const MIN_HZ      = 50;
+  const MAX_HZ      = 5000;
+  const REF_A4      = 440;
+  const SMOOTHING   = 0.6;
+
   const RING = {
-    innerRadiusRatio: 0.38,   // inner radius (as fraction of canvas min/2)
-    outerRadiusRatio: 0.95,   // outer radius (as fraction of canvas min/2)
-    labelRadiusRatio: 0.30,   // where to place note labels
-    gapRadians: 0.04,         // small gap between slices for readability
-    baseRotation: -Math.PI/2, // start with C at top (12 o'clock)
+    innerRadiusRatio: 0.38,
+    outerRadiusRatio: 0.95,
+    labelRadiusRatio: 0.30,
+    gapRadians: 0.02,          // small gap; reduces antialias seams
+    baseRotation: -Math.PI/2,  // C at 12 o’clock
   };
+
+  // Color config: hue per pitch class (C..B), darker for black keys
+  const NOTE_LABELS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const IS_BLACK    = [false,true,false,true,false,false,true,false,true,false,true,false]; // piano keyboard
+  const PC_HUE = i => (i * 30) % 360; // simple 12-hue wheel
+  const SLOT_BG_ALPHA = 0.12; // faint slot background fill
   // =========================
 
   // ===== Utilities =====
@@ -134,20 +139,41 @@
   const canvas   = document.getElementById('ring');
   const ctx      = canvas.getContext('2d', { alpha: true });
 
-  // DPR-aware resize to keep canvas crisp
   function fitCanvas(){
     const dpr = Math.max(1, window.devicePixelRatio || 1);
-    const cssSize = canvas.getBoundingClientRect();
-    canvas.width  = Math.round(cssSize.width * dpr);
-    canvas.height = Math.round(cssSize.height * dpr);
+    const css = canvas.getBoundingClientRect();
+    canvas.width  = Math.round(css.width * dpr);
+    canvas.height = Math.round(css.height * dpr);
     ctx.setTransform(dpr,0,0,dpr,0,0); // draw in CSS pixels
   }
-  // ensure a nice square area (CSS handles aspect; we just fit the backing store)
-  const ro = new ResizeObserver(fitCanvas); ro.observe(canvas);
+  new ResizeObserver(fitCanvas).observe(canvas);
 
   // ===== Ring draw =====
-  const NOTE_LABELS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-  let userRotation = 0; // radians, additive to baseRotation
+  let userRotation = 0; // radians
+
+  function wedgePath(cx, cy, rInner, rOuter, a0, a1){
+    const p = new Path2D();
+    p.arc(cx, cy, rOuter, a0, a1);
+    p.arc(cx, cy, rInner, a1, a0, true);
+    p.closePath();
+    return p;
+  }
+
+  function pcFillColor(i, intensity=1){
+    const h = PC_HUE(i);
+    const s = 65;
+    // white keys lighter, black keys darker; modulate lightness a bit by intensity
+    const baseL = IS_BLACK[i] ? 36 : 58;
+    const l = Math.max(10, Math.min(85, baseL + (intensity-0.5)*10));
+    return `hsl(${h} ${s}% ${l}%)`;
+  }
+
+  function slotBgColor(i){
+    const h = PC_HUE(i);
+    const s = 50, l = 50;
+    return `hsla(${h} ${s}% ${l}%, ${SLOT_BG_ALPHA})`;
+    // faint slot background fill to avoid “stripy” look
+  }
 
   function drawRing(pcd){
     const { width, height } = canvas.getBoundingClientRect();
@@ -159,60 +185,59 @@
 
     ctx.clearRect(0,0,width,height);
 
-    // background guide ring
-    ctx.beginPath();
-    ctx.arc(cx, cy, (rInner+rOuter)/2, 0, Math.PI*2);
-    ctx.strokeStyle = 'rgba(127,127,127,0.4)';
-    ctx.setLineDash([4,4]);
-    ctx.lineWidth = rOuter - rInner;
-    ctx.stroke();
-    ctx.setLineDash([]);
+    const slice = (Math.PI*2)/12;
+    const gap = Math.min(RING.gapRadians, slice*0.3);
 
-    const full = Math.PI*2;
-    const slice = full/12;
-    const gap = Math.min(RING.gapRadians, slice*0.3); // limit gap
+    // dynamic text size for mobile
+    const fontPx = Math.max(11, Math.min(18, Math.round(rMin*0.06)));
+    ctx.font = `${fontPx}px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
 
-    // draw each pitch-class as a radial wedge whose length == pcd[i]
     for (let i=0;i<12;i++){
-      const value = pcd[i]; // 0..1
-      const startA = RING.baseRotation + userRotation + i*slice + gap/2;
-      const endA   = startA + slice - gap;
+      const a0 = RING.baseRotation + userRotation + i*slice + gap/2;
+      const a1 = a0 + slice - gap;
 
-      const rVal = rInner + value * (rOuter - rInner);
-      // Fill the active magnitude wedge
-      ctx.beginPath();
-      // outer arc (value)
-      ctx.arc(cx, cy, rVal, startA, endA);
-      // inner arc (reverse)
-      ctx.arc(cx, cy, rInner, endA, startA, true);
-      ctx.closePath();
-      ctx.fillStyle = 'currentColor'; // picks up foreground color from theme
-      ctx.globalAlpha = 0.9;
-      ctx.fill();
-      ctx.globalAlpha = 1;
+      // 1) Fill the slot background (very faint)
+      ctx.fillStyle = slotBgColor(i);
+      ctx.fill(wedgePath(cx, cy, rInner, rOuter, a0, a1));
 
-      // thin outline for the full slot
-      ctx.beginPath();
-      ctx.arc(cx, cy, rOuter, startA, endA);
-      ctx.arc(cx, cy, rInner, endA, startA, true);
-      ctx.closePath();
-      ctx.strokeStyle = 'rgba(127,127,127,0.5)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
+      // 2) Active magnitude wedge (solid color, no stripes)
+      const val = pcd[i]; // 0..1
+      if (val > 0.001){
+        const rVal = rInner + val*(rOuter - rInner);
+        ctx.fillStyle = pcFillColor(i, val);
+        ctx.fill(wedgePath(cx, cy, rInner, rVal, a0, a1));
+      }
 
-      // label
-      const mid = (startA+endA)/2;
+      // 3) Label (with thin outline to survive busy backgrounds)
+      const mid = (a0+a1)/2;
       const lx = cx + Math.cos(mid)*rLabel;
-      const ly = cy + Math.sin(mid)*rLabel + 4; // slight baseline offset
-      ctx.font = '13px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
+      const ly = cy + Math.sin(mid)*rLabel;
+      // outline/halo
+      ctx.lineWidth = Math.max(2, fontPx/5);
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+      ctx.strokeText(NOTE_LABELS[i], lx, ly);
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.strokeText(NOTE_LABELS[i], lx, ly);
+      // fill
       ctx.fillStyle = 'currentColor';
       ctx.fillText(NOTE_LABELS[i], lx, ly);
+
+      // 4) Tiny dot on black keys to further differentiate (optional but nice)
+      if (IS_BLACK[i]){
+        const dotR = Math.max(2, rMin*0.01);
+        ctx.beginPath();
+        ctx.arc(cx + Math.cos(mid)*(rInner + (rOuter-rInner)*0.5),
+                cy + Math.sin(mid)*(rInner + (rOuter-rInner)*0.5),
+                dotR, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fill();
+      }
     }
   }
 
-  // ===== Rotate with drag (touch or mouse) =====
+  // ===== Rotate with drag (touch/mouse) =====
   let dragging = false, lastAngle = 0;
   function pointAngle(evt){
     const rect = canvas.getBoundingClientRect();
@@ -221,25 +246,9 @@
     const cx = rect.width/2, cy = rect.height/2;
     return Math.atan2(y - cy, x - cx);
   }
-  function onPointerDown(e){
-    e.preventDefault();
-    dragging = true;
-    lastAngle = pointAngle(e);
-    canvas.setPointerCapture?.(e.pointerId ?? 0);
-  }
-  function onPointerMove(e){
-    if (!dragging) return;
-    const a = pointAngle(e);
-    const delta = a - lastAngle;
-    lastAngle = a;
-    userRotation += delta;
-    drawRing(window.currentPCD);
-  }
-  function onPointerUp(e){
-    dragging = false;
-    canvas.releasePointerCapture?.(e.pointerId ?? 0);
-  }
-  // Support both Pointer Events and fallback to touch/mouse
+  function onPointerDown(e){ e.preventDefault(); dragging = true; lastAngle = pointAngle(e); canvas.setPointerCapture?.(e.pointerId ?? 0); }
+  function onPointerMove(e){ if (!dragging) return; const a = pointAngle(e); userRotation += (a - lastAngle); lastAngle = a; drawRing(window.currentPCD); }
+  function onPointerUp(e){ dragging = false; canvas.releasePointerCapture?.(e.pointerId ?? 0); }
   if ('onpointerdown' in window){
     canvas.addEventListener('pointerdown', onPointerDown);
     canvas.addEventListener('pointermove', onPointerMove);
@@ -256,21 +265,16 @@
   }
   resetRot.addEventListener('click', ()=>{ userRotation = 0; drawRing(window.currentPCD); });
 
-  // ===== Public hook for your AR torus =====
+  // ===== Public PCD hook =====
   window.currentPCD = new Float32Array(12);
-  // window.addEventListener('pcd', e => { const pcd = e.detail; ... })
+  // window.addEventListener('pcd', e => { ... })
 
   // ===== Audio + analysis =====
-  let audioContext, workletNode, micStream, running=false;
-  let sampleRate = 48000;
+  let audioContext, workletNode, micStream, running=false, sampleRate=48000;
 
   const workletURL = URL.createObjectURL(new Blob([`
     class Tap extends AudioWorkletProcessor {
-      process(inputs){
-        const ch = inputs[0][0];
-        if (ch) this.port.postMessage(ch.slice(0));
-        return true;
-      }
+      process(inputs){ const ch = inputs[0][0]; if (ch) this.port.postMessage(ch.slice(0)); return true; }
     }
     registerProcessor('tap', Tap);
   `], {type:'text/javascript'}));
@@ -312,15 +316,12 @@
     };
 
     function analyze(){
-      // rebuild contiguous window
       const start = writeIdx % WINDOW_SIZE;
       const buf = new Float32Array(WINDOW_SIZE);
       const first = ringBuf.subarray(start);
       buf.set(first, 0);
       buf.set(ringBuf.subarray(0, start), first.length);
-      // windowing
       for (let i=0;i<WINDOW_SIZE;i++) buf[i] *= windowFn[i];
-      // FFT → PCD
       const mags = fftReal(buf);
       const pcd = spectrumToPCD(mags, sampleRate, REF_A4, MIN_HZ, MAX_HZ);
       for (let i=0;i<12;i++){
@@ -332,7 +333,6 @@
       statusEl.textContent = `Running @ ${sampleRate} Hz | N=${WINDOW_SIZE} hop=${HOP_SIZE}`;
     }
 
-    // First paint
     fitCanvas();
     drawRing(window.currentPCD);
   }

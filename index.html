@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Mic → PCD (Even-Hue Ring + Tuning Needle)</title>
+<title>Mic → PCD (Ring + Tuning Needle + Reactivity)</title>
 <style>
   :root { color-scheme: dark light; }
   * { box-sizing: border-box; }
   body{
     margin:0; padding:12px; font-family: system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-    display:grid; gap:12px; min-height:100svh; grid-template-rows:auto 1fr auto;
+    display:grid; gap:12px; min-height:100svh; grid-template-rows:auto auto 1fr auto;
   }
   header, footer{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
   button{
@@ -17,6 +17,13 @@
     touch-action:manipulation;
   }
   #status{ opacity:.8 }
+  details.settings {
+    border:1px solid color-mix(in oklab, currentColor 20%, transparent);
+    border-radius:12px; padding:8px 12px;
+  }
+  .row{display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin:4px 0}
+  .row label{min-width:11ch; opacity:.85}
+  .row input[type="range"]{ width:220px; }
   .canvas-wrap{ display:grid; place-items:center; width:100%; height:100%; }
   canvas{
     max-width: min(100%, 720px);
@@ -38,6 +45,28 @@
     <button id="resetRot" title="Reset ring rotation">Reset ring</button>
     <span id="status">Idle</span>
   </header>
+
+  <details class="settings">
+    <summary><strong>Settings</strong> ⚙️</summary>
+    <div class="row">
+      <label for="reactRange">Reactivity</label>
+      <input id="reactRange" type="range" min="0.05" max="1.00" step="0.01" value="0.35">
+      <span id="reactVal">0.35</span>
+      <small>← smoother | snappier →</small>
+    </div>
+    <div class="row">
+      <label for="promRange">Min Prom (dB)</label>
+      <input id="promRange" type="range" min="0" max="24" step="0.5" value="6">
+      <span id="promVal">6.0 dB</span>
+      <small>peak prominence required to show needle</small>
+    </div>
+    <div class="row">
+      <label for="rmsRange">Min RMS</label>
+      <input id="rmsRange" type="range" min="0" max="0.02" step="0.0005" value="0.003">
+      <span id="rmsVal">0.0030</span>
+      <small>gate quiet frames</small>
+    </div>
+  </details>
 
   <div class="canvas-wrap">
     <canvas id="ring"></canvas>
@@ -74,18 +103,19 @@
   const PC_HUE = i => (COLOR.startHue + i * 30) % 360;
   const SLOT_BG_ALPHA = 0.10;
 
-  // Tuning needle display & detection thresholds
+  // Tuning needle defaults (some are user-adjustable below)
   const TUNER = {
     enabled: true,
-    minHz: 70,            // restrict peak search to musical range
-    maxHz: 1800,          // avoid very high partials
-    minProminence: 14.0,   // dB above local median to trust a peak
-    minRMS: 0.003,        // min frame RMS to show needle
+    minHz: 70,
+    maxHz: 1800,
+    minProminence: 6.0,  // dB (slider)
+    minRMS: 0.003,       // (slider)
+    reactivity: 0.35,    // 0.05..1.0 (slider) — EMA step for angle smoothing
     needleColor: '#00aaff',
     needleWidth: 3,
-    hubRadiusRatio: 0.05, // center hub radius (as fraction of min/2)
-    tipRadiusRatio: 0.98, // how far the needle tip reaches
-    tailRadiusRatio: 0.20 // optional tail inward
+    hubRadiusRatio: 0.05,
+    tipRadiusRatio: 0.98,
+    tailRadiusRatio: 0.20
   };
   // =========================
 
@@ -138,7 +168,7 @@
       const f = k*binHz;
       const midi = 69 + 12*Math.log2(f/a4);
       const pc = ((Math.round(midi)%12)+12)%12;
-      const w = mags[k]*mags[k];
+      const w = mags[k]*mags[k]; // power weighting
       pcd[pc]+=w;
     }
     let sum=0; for (let i=0;i<12;i++) sum+=pcd[i];
@@ -168,7 +198,7 @@
     const med = neigh[Math.floor(neigh.length/2)] + 1e-12;
     const prominenceDb = 20*Math.log10((maxVal+1e-12) / med);
 
-    // parabolic interpolation (Quinn's parabola)
+    // parabolic interpolation
     const a = mags[k-1], b = mags[k], c = mags[k+1];
     const denom = (a - 2*b + c) || 1e-12;
     const delta = 0.5 * (a - c) / denom; // shift in bins, usually in [-0.5,0.5]
@@ -188,6 +218,27 @@
   const canvas   = document.getElementById('ring');
   const ctx      = canvas.getContext('2d', { alpha: true });
 
+  // Settings controls
+  const reactRange = document.getElementById('reactRange');
+  const reactVal   = document.getElementById('reactVal');
+  const promRange  = document.getElementById('promRange');
+  const promVal    = document.getElementById('promVal');
+  const rmsRange   = document.getElementById('rmsRange');
+  const rmsVal     = document.getElementById('rmsVal');
+
+  reactRange.addEventListener('input', () => {
+    TUNER.reactivity = parseFloat(reactRange.value);
+    reactVal.textContent = TUNER.reactivity.toFixed(2);
+  });
+  promRange.addEventListener('input', () => {
+    TUNER.minProminence = parseFloat(promRange.value);
+    promVal.textContent = TUNER.minProminence.toFixed(1) + ' dB';
+  });
+  rmsRange.addEventListener('input', () => {
+    TUNER.minRMS = parseFloat(rmsRange.value);
+    rmsVal.textContent = TUNER.minRMS.toFixed(4);
+  });
+
   function fitCanvas(){
     const dpr = Math.max(1, window.devicePixelRatio || 1);
     const css = canvas.getBoundingClientRect();
@@ -199,7 +250,9 @@
 
   // ===== Ring drawing =====
   let userRotation = 0; // radians
-  let lastPrimary = null; // {midiReal, nearest, cents, pc, angle, confDb}
+  let needleAngleSm = null; // smoothed angle (radians)
+  let centsSm = null;       // smoothed cents display
+  let lastPrimary = null;   // raw latest reading for UI
 
   function wedgePath(cx, cy, rInner, rOuter, a0, a1){
     const p = new Path2D();
@@ -267,41 +320,42 @@
       }
     }
 
-    // Draw tuning needle if available & confident
-    if (TUNER.enabled && lastPrimary?.confDb !== undefined){
-      const confOk = lastPrimary.confDb >= TUNER.minProminence;
-      if (confOk){
-        const angle = lastPrimary.angle; // absolute canvas angle
-        const hubR  = rMin * TUNER.hubRadiusRatio;
-        const tipR  = rMin * TUNER.tipRadiusRatio;
-        const tailR = rMin * TUNER.tailRadiusRatio;
+    // Draw tuning needle (smoothed angle)
+    if (needleAngleSm != null){
+      const hubR  = rMin * TUNER.hubRadiusRatio;
+      const tipR  = rMin * TUNER.tipRadiusRatio;
+      const tailR = rMin * TUNER.tailRadiusRatio;
 
-        // needle
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(angle);
-        ctx.strokeStyle = TUNER.needleColor;
-        ctx.lineWidth = TUNER.needleWidth;
-        ctx.lineCap = 'round';
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(needleAngleSm);
+      ctx.strokeStyle = TUNER.needleColor;
+      ctx.lineWidth = TUNER.needleWidth;
+      ctx.lineCap = 'round';
 
-        // main line (tail → tip)
-        ctx.beginPath();
-        ctx.moveTo(tailR, 0);
-        ctx.lineTo(tipR, 0);
-        ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(tailR, 0);
+      ctx.lineTo(tipR, 0);
+      ctx.stroke();
 
-        // hub
-        ctx.beginPath();
-        ctx.arc(0, 0, hubR, 0, Math.PI*2);
-        ctx.fillStyle = 'color-mix(in oklab, currentColor 20%, transparent)';
-        ctx.fill();
-        ctx.strokeStyle = 'color-mix(in oklab, currentColor 40%, transparent)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, hubR, 0, Math.PI*2);
+      ctx.fillStyle = 'color-mix(in oklab, currentColor 20%, transparent)';
+      ctx.fill();
+      ctx.strokeStyle = 'color-mix(in oklab, currentColor 40%, transparent)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
 
-        ctx.restore();
-      }
+      ctx.restore();
     }
+  }
+
+  // Angle unwrapping helper: get shortest angular difference in [-π, π]
+  function wrapDiff(target, current){
+    let d = target - current;
+    while (d >  Math.PI) d -= 2*Math.PI;
+    while (d < -Math.PI) d += 2*Math.PI;
+    return d;
   }
 
   // ===== Drag to rotate =====
@@ -410,29 +464,33 @@
         window.currentPCD[i] = SMOOTHING*window.currentPCD[i] + (1-SMOOTHING)*pcd[i];
       }
 
-      // --- Tuning needle estimation ---
+      // --- Tuning needle estimation (with smoothing controls) ---
       lastPrimary = null;
       if (TUNER.enabled && rms >= TUNER.minRMS){
         const est = estimatePrimary(mags, sampleRate, TUNER.minHz, TUNER.maxHz);
-        if (est){
-          const confDb = est.prominenceDb;
-          if (confDb >= TUNER.minProminence){
-            const midiReal = 69 + 12*Math.log2(est.freq / REF_A4);
-            const nearest  = Math.round(midiReal);
-            const cents    = (midiReal - nearest) * 100; // positive = sharp
-            const pc       = ((nearest % 12) + 12) % 12;
+        if (est && est.prominenceDb >= TUNER.minProminence){
+          const midiReal = 69 + 12*Math.log2(est.freq / REF_A4);
+          const nearest  = Math.round(midiReal);
+          const cents    = (midiReal - nearest) * 100; // positive = sharp
+          const pc       = ((nearest % 12) + 12) % 12;
 
-            // angle of the nearest pitch-class center (like label position)
-            const slice = (Math.PI*2)/12;
-            const a0 = RING.baseRotation + userRotation + pc*slice + RING.gapRadians/2;
-            const a1 = a0 + slice - RING.gapRadians;
-            const mid = (a0+a1)/2;
+          const slice = (Math.PI*2)/12;
+          const a0 = RING.baseRotation + userRotation + pc*slice + RING.gapRadians/2;
+          const a1 = a0 + slice - RING.gapRadians;
+          const mid = (a0+a1)/2;
+          const angleRaw = mid + (cents/100) * slice;
 
-            // offset within that semitone: cents/100 of one slice
-            const angle = mid + (cents/100) * slice;
+          // initialize smoothed state if null
+          if (needleAngleSm == null){ needleAngleSm = angleRaw; }
+          if (centsSm == null){ centsSm = cents; }
 
-            lastPrimary = { midiReal, nearest, cents, pc, angle, confDb, freq: est.freq };
-          }
+          // EMA smoothing with angle unwrapping
+          const step = Math.max(0.05, Math.min(1.0, TUNER.reactivity)); // clamp
+          const dAng = wrapDiff(angleRaw, needleAngleSm);
+          needleAngleSm = needleAngleSm + step * dAng;
+          centsSm = centsSm + step * (cents - centsSm);
+
+          lastPrimary = { cents, centsSm, pc, freq: est.freq, confDb: est.prominenceDb };
         }
       }
 
@@ -440,12 +498,17 @@
       pcdText.textContent = '[' + Array.from(window.currentPCD).map(v=>v.toFixed(3)).join(', ') + ']';
       drawRing(window.currentPCD);
 
-      // tuner readout text
       if (lastPrimary){
         const name = NOTE_LABELS[lastPrimary.pc];
-        const centsStr = (lastPrimary.cents>=0?'+':'') + lastPrimary.cents.toFixed(1);
+        const centsStr = (lastPrimary.centsSm>=0?'+':'') + lastPrimary.centsSm.toFixed(1);
         tuneEl.textContent = `Primary: ${name}  ${centsStr}¢  (~${lastPrimary.freq.toFixed(1)} Hz, ${lastPrimary.confDb.toFixed(1)} dB)`;
       } else {
+        // slowly fade needle toward null if no reading
+        if (needleAngleSm != null){
+          // optional slow decay: reduce influence
+          // Here we simply keep last angle; or uncomment to decay:
+          // needleAngleSm = null; centsSm = null;
+        }
         tuneEl.textContent = '';
       }
 
@@ -470,8 +533,12 @@
   startBtn.addEventListener('click', start, { passive: true });
   stopBtn.addEventListener('click', stop, { passive: true });
 
-  // Initial canvas setup
-  fitCanvas(); drawRing(new Float32Array(12));
+  // Initial canvas setup + reflect slider defaults
+  fitCanvas(); 
+  document.getElementById('reactVal').textContent = TUNER.reactivity.toFixed(2);
+  document.getElementById('promVal').textContent  = TUNER.minProminence.toFixed(1) + ' dB';
+  document.getElementById('rmsVal').textContent   = TUNER.minRMS.toFixed(4);
+  drawRing(new Float32Array(12));
 </script>
 </body>
 </html>

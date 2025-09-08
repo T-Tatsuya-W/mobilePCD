@@ -51,8 +51,8 @@
   // =========================
   // ====== CONFIG HERE ======
   // =========================
-  const WINDOW_SIZE = 4096;   // power of 2: 2048, 4096, 8192...
-  const HOP_SIZE    = 1024;   // step between analyses (samples)
+  const WINDOW_SIZE = 8192*2;   // power of 2: 2048, 4096, 8192...  try WINDOW_SIZE=8192, HOP_SIZE=2048
+  const HOP_SIZE    = 2048*2;   // step between analyses (samples)
   const MIN_HZ      = 50;     // ignore rumble below
   const MAX_HZ      = 5000;   // ignore hiss above
   const REF_A4      = 440;    // tuning reference

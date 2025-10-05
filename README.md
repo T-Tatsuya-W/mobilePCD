@@ -72,14 +72,42 @@ A web-based real-time audio analyzer that visualizes pitch class distribution (P
 
 ## 🛠️ Architecture
 
-Built as a single-file HTML application with:
+Modular web application with clean separation of concerns:
+- **`index.html`**: Clean HTML structure and layout
+- **`styles.css`**: Responsive CSS with mobile-first design
+- **`script.js`**: Complete audio processing and visualization logic
 - **Vanilla JavaScript**: No external dependencies
 - **WebAudio API**: Real-time audio processing
 - **Canvas 2D**: Hardware-accelerated graphics
 - **CSS Grid/Flexbox**: Responsive layout
 - **Modern ES6+**: Modules, async/await, destructuring
 
-## 📊 Output Data
+## � Local Development
+
+### Quick Start
+```bash
+# Navigate to project directory
+cd mobilePCD
+
+# Start local development server
+python3 -m http.server 8000
+
+# Open in browser
+# http://localhost:8000
+```
+
+### File Structure
+```
+mobilePCD/
+├── index.html          # Main HTML structure
+├── styles.css          # Responsive styling
+├── script.js           # Audio processing & visualization
+└── README.md           # Documentation
+```
+
+**Note**: Due to browser security restrictions (CORS), the application must be served via HTTP/HTTPS. Opening `index.html` directly as a file will not work properly.
+
+## �📊 Output Data
 
 The analyzer exposes:
 - **PCD Array**: 12-element Float32Array of normalized pitch class energies
@@ -89,4 +117,4 @@ The analyzer exposes:
 
 ---
 
-*Single-file web application - just open `index.html` in a modern browser to start analyzing!*
+*Modular web application - serve via HTTP server to start analyzing!*

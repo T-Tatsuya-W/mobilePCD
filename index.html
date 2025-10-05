@@ -26,10 +26,9 @@
   .row input[type="range"]{ width:220px; }
   .canvas-wrap{ display:grid; place-items:center; width:100%; height:100%; }
   canvas{
-    max-width: min(100%, 720px);
-    max-height: min(100%, 720px);
-    width: 100%;
-    height: auto;
+    width: min(100%, 720px);
+    height: min(100%, 720px);
+    aspect-ratio: 1;
     touch-action:none; /* for dragging rotation on mobile */
     border-radius: 16px;
     border: 1px solid color-mix(in oklab, currentColor 30%, transparent);
@@ -48,6 +47,69 @@
 
   <details class="settings">
     <summary><strong>Settings</strong> ⚙️</summary>
+    
+    <!-- AUDIO PROCESSING SECTION -->
+    <h4 style="margin:16px 0 8px 0; opacity:0.8; border-bottom:1px solid color-mix(in oklab, currentColor 20%, transparent); padding-bottom:4px;">🔊 Audio Processing</h4>
+    <div class="row">
+      <label for="windowRange">Window Size</label>
+      <input id="windowRange" type="range" min="11" max="16" step="1" value="14">
+      <span id="windowVal">16384</span>
+      <small>FFT window (2^n samples, larger = better freq resolution)</small>
+    </div>
+    <div class="row">
+      <label for="hopRange">Hop Size</label>
+      <input id="hopRange" type="range" min="8" max="14" step="1" value="10">
+      <span id="hopVal">1024</span>
+      <small>analysis hop (2^n samples, smaller = more updates)</small>
+    </div>
+    <div class="row">
+      <label for="minHzRange">Min Freq (Hz)</label>
+      <input id="minHzRange" type="range" min="20" max="200" step="5" value="50">
+      <span id="minHzVal">50 Hz</span>
+      <small>lowest frequency to analyze</small>
+    </div>
+    <div class="row">
+      <label for="maxHzRange">Max Freq (Hz)</label>
+      <input id="maxHzRange" type="range" min="1000" max="8000" step="100" value="5000">
+      <span id="maxHzVal">5000 Hz</span>
+      <small>highest frequency to analyze</small>
+    </div>
+    <div class="row">
+      <label for="refA4Input">Reference A4</label>
+      <input id="refA4Input" type="number" min="400" max="480" step="0.1" value="440.0" style="width:80px; padding:6px 8px; border-radius:6px; border:1px solid #888; background:transparent; color:currentColor;">
+      <span style="opacity:0.7">Hz</span>
+      <small>tuning reference (baroque=415, concert=440, etc.)</small>
+    </div>
+    
+    <!-- PCD PROCESSING SECTION -->
+    <h4 style="margin:16px 0 8px 0; opacity:0.8; border-bottom:1px solid color-mix(in oklab, currentColor 20%, transparent); padding-bottom:4px;">📊 PCD Processing</h4>
+    <div class="row">
+      <label for="pcdRmsRange">PCD Min RMS</label>
+      <input id="pcdRmsRange" type="range" min="0" max="0.01" step="0.0001" value="0.001">
+      <span id="pcdRmsVal">0.0010</span>
+      <small>minimum signal level for PCD calculation</small>
+    </div>
+    <div class="row">
+      <label for="pcdThreshRange">PCD Threshold</label>
+      <input id="pcdThreshRange" type="range" min="0" max="0.1" step="0.001" value="0.005">
+      <span id="pcdThreshVal">0.005</span>
+      <small>minimum magnitude to include in PCD</small>
+    </div>
+    <div class="row">
+      <label for="smoothRange">PCD Smoothing</label>
+      <input id="smoothRange" type="range" min="0.1" max="0.9" step="0.05" value="0.6">
+      <span id="smoothVal">0.60</span>
+      <small>temporal smoothing (0.1=reactive, 0.9=smooth)</small>
+    </div>
+    <div class="row">
+      <label for="pcdNormRange">PCD Normalize</label>
+      <input id="pcdNormRange" type="range" min="0.5" max="3.0" step="0.1" value="1.0">
+      <span id="pcdNormVal">1.0</span>
+      <small>PCD power scaling (>1 = sharper peaks, <1 = flatter)</small>
+    </div>
+    
+    <!-- TUNING NEEDLE SECTION -->
+    <h4 style="margin:16px 0 8px 0; opacity:0.8; border-bottom:1px solid color-mix(in oklab, currentColor 20%, transparent); padding-bottom:4px;">🎯 Tuning Needle</h4>
     <div class="row">
       <label for="reactRange">Reactivity</label>
       <input id="reactRange" type="range" min="0.05" max="1.00" step="0.01" value="0.35">
@@ -55,16 +117,40 @@
       <small>← smoother | snappier →</small>
     </div>
     <div class="row">
-      <label for="promRange">Min Prom (dB)</label>
+      <label for="promRange">Min Prominence</label>
       <input id="promRange" type="range" min="0" max="24" step="0.5" value="6">
       <span id="promVal">6.0 dB</span>
       <small>peak prominence required to show needle</small>
     </div>
     <div class="row">
-      <label for="rmsRange">Min RMS</label>
+      <label for="rmsRange">Needle Min RMS</label>
       <input id="rmsRange" type="range" min="0" max="0.02" step="0.0005" value="0.003">
       <span id="rmsVal">0.0030</span>
-      <small>gate quiet frames</small>
+      <small>minimum signal level for needle activation</small>
+    </div>
+    <div class="row">
+      <label for="tunerMinRange">Needle Min Freq</label>
+      <input id="tunerMinRange" type="range" min="40" max="150" step="5" value="70">
+      <span id="tunerMinVal">70 Hz</span>
+      <small>lowest frequency for tuning needle</small>
+    </div>
+    <div class="row">
+      <label for="tunerMaxRange">Needle Max Freq</label>
+      <input id="tunerMaxRange" type="range" min="800" max="3000" step="50" value="1800">
+      <span id="tunerMaxVal">1800 Hz</span>
+      <small>highest frequency for tuning needle</small>
+    </div>
+    
+    <!-- DISPLAY SECTION -->
+    <h4 style="margin:16px 0 8px 0; opacity:0.8; border-bottom:1px solid color-mix(in oklab, currentColor 20%, transparent); padding-bottom:4px;">🎵 Display</h4>
+    <div class="row">
+      <label for="noteNames">Note Names</label>
+      <select id="noteNames" style="padding:8px; border-radius:8px; border:1px solid #888; background:transparent; color:currentColor; min-width:140px;">
+        <option value="sharps">Sharps (C#, D#, F#, G#, A#)</option>
+        <option value="flats">Flats (Db, Eb, Gb, Ab, Bb)</option>
+        <option value="mixed">Mixed (C#/Db, D#/Eb, etc.)</option>
+      </select>
+      <small>how to display black keys</small>
     </div>
   </details>
 
@@ -81,12 +167,17 @@
   // =========================
   // ====== CONFIG HERE ======
   // =========================
-  const WINDOW_SIZE = 8192*2;   // larger window helps tuning stability
-  const HOP_SIZE    = 2048*2;
-  const MIN_HZ      = 50;
-  const MAX_HZ      = 5000;
-  const REF_A4      = 440;
-  const SMOOTHING   = 0.6;
+  let WINDOW_SIZE = 8192*2;   // larger window helps tuning stability
+  let HOP_SIZE    = 1024;
+  let MIN_HZ      = 50;
+  let MAX_HZ      = 5000;
+  let REF_A4      = 440;
+  let SMOOTHING   = 0.6;
+  
+  // PCD filtering parameters
+  let PCD_MIN_RMS = 0.001;      // minimum RMS for PCD calculation
+  let PCD_THRESHOLD = 0.005;    // minimum magnitude to include in PCD
+  let PCD_NORMALIZE = 1.0;      // power scaling for PCD normalization
 
   const RING = {
     innerRadiusRatio: 0.38,
@@ -97,8 +188,14 @@
   };
 
   // Even-hue color palette (equal S/L; 30° steps)
-  const NOTE_LABELS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-  const IS_BLACK    = [false,true,false,true,false,false,true,false,true,false,true,false];
+  // Different note naming conventions
+  const NOTE_LABELS = {
+    sharps: ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'],
+    flats:  ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'],
+    mixed:  ['C','C#/Db','D','D#/Eb','E','F','F#/Gb','G','G#/Ab','A','A#/Bb','B']
+  };
+  let currentNoteLabels = NOTE_LABELS.sharps; // default
+  const IS_BLACK    = [true,false,true,false,false,true,false,true,false,true,false,false]; // C#,D,D#,E,F,F#,G,G#,A,A#,B,C
   const COLOR = { startHue: 0, sat: 80, light: 55 };
   const PC_HUE = i => (COLOR.startHue + i * 30) % 360;
   const SLOT_BG_ALPHA = 0.10;
@@ -120,88 +217,176 @@
   // =========================
 
   // ===== Utilities =====
+  // Cache window functions to avoid recomputation
+  const windowCache = new Map();
   const hann = (N) => {
-    const w = new Float32Array(N), t = 2*Math.PI/(N-1);
-    for (let n=0;n<N;n++) w[n] = 0.5*(1-Math.cos(t*n));
+    if (windowCache.has(N)) return windowCache.get(N);
+    const w = new Float32Array(N);
+    const t = 2 * Math.PI / (N - 1);
+    for (let n = 0; n < N; n++) w[n] = 0.5 * (1 - Math.cos(t * n));
+    windowCache.set(N, w);
     return w;
   };
 
-  function fftReal(signal){
-    let N=1; while (N<signal.length) N<<=1;
-    const re = new Float32Array(N), im = new Float32Array(N);
-    re.set(signal);
-    let j=0;
-    for (let i=1;i<N;i++){
-      let bit=N>>1;
-      for(; j & bit; bit>>=1) j^=bit;
-      j^=bit;
-      if(i<j){ [re[i],re[j]]=[re[j],re[i]]; [im[i],im[j]]=[im[j],im[i]]; }
+  // Pre-allocated buffers for FFT (reused to avoid GC pressure)
+  let fftBufferRe, fftBufferIm, fftMags, bitRevTable;
+  let currentFFTSize = 0;
+
+  function initFFTBuffers(N){
+    if (N === currentFFTSize) return; // Already initialized
+    currentFFTSize = N;
+    fftBufferRe = new Float32Array(N);
+    fftBufferIm = new Float32Array(N);
+    fftMags = new Float32Array(N/2);
+    
+    // Pre-compute bit-reversal table
+    bitRevTable = new Uint32Array(N);
+    let j = 0;
+    for (let i = 1; i < N; i++) {
+      let bit = N >> 1;
+      for (; j & bit; bit >>= 1) j ^= bit;
+      j ^= bit;
+      bitRevTable[i] = j;
     }
-    for (let len=2; len<=N; len<<=1){
-      const ang=-2*Math.PI/len;
-      const wlenRe=Math.cos(ang), wlenIm=Math.sin(ang);
-      for(let i=0;i<N;i+=len){
-        let wRe=1,wIm=0;
-        for(let k=0;k<len/2;k++){
-          const uRe=re[i+k], uIm=im[i+k];
-          const vRe=re[i+k+len/2]*wRe - im[i+k+len/2]*wIm;
-          const vIm=re[i+k+len/2]*wIm + im[i+k+len/2]*wRe;
-          re[i+k]=uRe+vRe;       im[i+k]=uIm+vIm;
-          re[i+k+len/2]=uRe-vRe; im[i+k+len/2]=uIm-vIm;
-          const nwRe=wRe*wlenRe - wIm*wlenIm;
-          const nwIm=wRe*wlenIm + wIm*wlenRe;
-          wRe=nwRe; wIm=nwIm;
+  }
+
+  function fftReal(signal){
+    let N = 1; while (N < signal.length) N <<= 1;
+    initFFTBuffers(N);
+    
+    // Clear and copy input
+    fftBufferRe.fill(0);
+    fftBufferIm.fill(0);
+    fftBufferRe.set(signal);
+    
+    // Bit-reversal using pre-computed table
+    for (let i = 1; i < N; i++) {
+      const j = bitRevTable[i];
+      if (i < j) {
+        [fftBufferRe[i], fftBufferRe[j]] = [fftBufferRe[j], fftBufferRe[i]];
+        [fftBufferIm[i], fftBufferIm[j]] = [fftBufferIm[j], fftBufferIm[i]];
+      }
+    }
+    
+    // FFT computation with pre-computed twiddle factors
+    for (let len = 2; len <= N; len <<= 1) {
+      const ang = -2 * Math.PI / len;
+      const wlenRe = Math.cos(ang), wlenIm = Math.sin(ang);
+      for (let i = 0; i < N; i += len) {
+        let wRe = 1, wIm = 0;
+        const halfLen = len >> 1;
+        for (let k = 0; k < halfLen; k++) {
+          const uRe = fftBufferRe[i + k], uIm = fftBufferIm[i + k];
+          const vRe = fftBufferRe[i + k + halfLen] * wRe - fftBufferIm[i + k + halfLen] * wIm;
+          const vIm = fftBufferRe[i + k + halfLen] * wIm + fftBufferIm[i + k + halfLen] * wRe;
+          fftBufferRe[i + k] = uRe + vRe;
+          fftBufferIm[i + k] = uIm + vIm;
+          fftBufferRe[i + k + halfLen] = uRe - vRe;
+          fftBufferIm[i + k + halfLen] = uIm - vIm;
+          const nwRe = wRe * wlenRe - wIm * wlenIm;
+          const nwIm = wRe * wlenIm + wIm * wlenRe;
+          wRe = nwRe; wIm = nwIm;
         }
       }
     }
-    const mags = new Float32Array(N/2);
-    for (let i=0;i<N/2;i++) mags[i]=Math.hypot(re[i],im[i]);
-    return mags;
+    
+    // Compute magnitudes (reuse buffer)
+    const halfN = N >> 1;
+    for (let i = 0; i < halfN; i++) {
+      fftMags[i] = Math.sqrt(fftBufferRe[i] * fftBufferRe[i] + fftBufferIm[i] * fftBufferIm[i]);
+    }
+    return fftMags.subarray(0, halfN);
+  }
+
+  // Pre-computed lookup tables for PCD calculation
+  let pcdLookupTable = null;
+  let currentSampleRate = 0, currentA4 = 0, currentMagsLength = 0;
+
+  function initPCDLookup(magsLength, sampleRate, a4) {
+    if (sampleRate === currentSampleRate && a4 === currentA4 && magsLength === currentMagsLength) return;
+    currentSampleRate = sampleRate;
+    currentA4 = a4;
+    currentMagsLength = magsLength;
+    
+    pcdLookupTable = new Uint8Array(magsLength); // pitch class for each bin
+    const binHz = sampleRate / (magsLength * 2);
+    const log2A4 = Math.log2(a4);
+    
+    for (let k = 0; k < magsLength; k++) {
+      const f = k * binHz;
+      if (f > 0) {
+        const midi = 69 + 12 * (Math.log2(f) - log2A4);
+        pcdLookupTable[k] = ((Math.round(midi) % 12) + 12) % 12;
+      }
+    }
   }
 
   function spectrumToPCD(mags, sampleRate, a4=440, minHz=50, maxHz=5000){
+    initPCDLookup(mags.length, sampleRate, a4);
+    
     const pcd = new Float32Array(12);
-    const binHz = sampleRate/(mags.length*2);
-    const minBin = Math.max(1, Math.floor(minHz/binHz));
-    const maxBin = Math.min(mags.length-1, Math.floor(maxHz/binHz));
-    for (let k=minBin;k<=maxBin;k++){
-      const f = k*binHz;
-      const midi = 69 + 12*Math.log2(f/a4);
-      const pc = ((Math.round(midi)%12)+12)%12;
-      const w = mags[k]*mags[k]; // power weighting
-      pcd[pc]+=w;
+    const binHz = sampleRate / (mags.length * 2);
+    const minBin = Math.max(1, Math.floor(minHz / binHz));
+    const maxBin = Math.min(mags.length - 1, Math.floor(maxHz / binHz));
+    
+    // Vectorized accumulation with threshold filtering
+    for (let k = minBin; k <= maxBin; k++) {
+      const mag = mags[k];
+      if (mag > PCD_THRESHOLD) { // apply magnitude threshold
+        const pc = pcdLookupTable[k];
+        pcd[pc] += mag * mag; // power weighting
+      }
     }
-    let sum=0; for (let i=0;i<12;i++) sum+=pcd[i];
-    if (sum>0) for (let i=0;i<12;i++) pcd[i]/=sum;
+    
+    // Apply power normalization and normalize
+    let sum = 0;
+    for (let i = 0; i < 12; i++) {
+      if (PCD_NORMALIZE !== 1.0) {
+        pcd[i] = Math.pow(pcd[i], PCD_NORMALIZE);
+      }
+      sum += pcd[i];
+    }
+    if (sum > 0) {
+      const invSum = 1 / sum;
+      for (let i = 0; i < 12; i++) pcd[i] *= invSum;
+    }
     return pcd;
   }
 
-  // Dominant peak estimation with parabolic interpolation around bin k
+  // Optimized peak detection with early termination
   function estimatePrimary(mags, sampleRate, minHz, maxHz){
-    const N2 = mags.length;               // N/2
-    const binHz = sampleRate / (N2*2);    // bin width
-    let kMin = Math.max(2, Math.floor(minHz/binHz));
-    let kMax = Math.min(N2-3, Math.floor(maxHz/binHz));
+    const N2 = mags.length;
+    const binHz = sampleRate / (N2 * 2);
+    const kMin = Math.max(2, Math.floor(minHz / binHz));
+    const kMax = Math.min(N2 - 3, Math.floor(maxHz / binHz));
 
-    // find max bin
-    let k = kMin, maxVal = -1;
-    for (let i=kMin;i<=kMax;i++){
+    // Find max bin with early termination for very weak signals
+    let k = kMin, maxVal = 0;
+    const threshold = 1e-6; // Skip very weak signals early
+    
+    for (let i = kMin; i <= kMax; i++) {
       const v = mags[i];
-      if (v > maxVal){ maxVal=v; k=i; }
+      if (v > maxVal) { maxVal = v; k = i; }
     }
-    if (maxVal <= 0) return null;
+    if (maxVal < threshold) return null;
 
-    // local median for a small neighborhood to compute prominence
-    const w = 20; // +/- bins
-    let from = Math.max(kMin, k-w), to = Math.min(kMax, k+w);
-    const neigh = mags.slice(from, to+1).sort((a,b)=>a-b);
-    const med = neigh[Math.floor(neigh.length/2)] + 1e-12;
-    const prominenceDb = 20*Math.log10((maxVal+1e-12) / med);
+    // Reduced neighborhood for prominence (faster)
+    const w = 10; // reduced from 20
+    const from = Math.max(kMin, k - w);
+    const to = Math.min(kMax, k + w);
+    
+    // Fast median approximation using 3-point estimate
+    let sum = 0, count = 0;
+    for (let i = from; i <= to; i += 2) { // sample every other bin
+      if (i !== k) { sum += mags[i]; count++; }
+    }
+    const avgNeighbor = count > 0 ? sum / count : 0;
+    const prominenceDb = avgNeighbor > 0 ? 20 * Math.log10((maxVal + 1e-12) / (avgNeighbor + 1e-12)) : 0;
 
-    // parabolic interpolation
-    const a = mags[k-1], b = mags[k], c = mags[k+1];
-    const denom = (a - 2*b + c) || 1e-12;
-    const delta = 0.5 * (a - c) / denom; // shift in bins, usually in [-0.5,0.5]
+    // Parabolic interpolation (unchanged - already efficient)
+    const a = mags[k - 1], b = mags[k], c = mags[k + 1];
+    const denom = (a - 2 * b + c) || 1e-12;
+    const delta = 0.5 * (a - c) / denom;
     const kRef = k + Math.max(-1, Math.min(1, delta));
     const freq = kRef * binHz;
 
@@ -225,6 +410,38 @@
   const promVal    = document.getElementById('promVal');
   const rmsRange   = document.getElementById('rmsRange');
   const rmsVal     = document.getElementById('rmsVal');
+  const refA4Input = document.getElementById('refA4Input');
+  const windowRange = document.getElementById('windowRange');
+  const windowVal   = document.getElementById('windowVal');
+  const hopRange    = document.getElementById('hopRange');
+  const hopVal      = document.getElementById('hopVal');
+  const smoothRange = document.getElementById('smoothRange');
+  const smoothVal   = document.getElementById('smoothVal');
+  const minHzRange  = document.getElementById('minHzRange');
+  const minHzVal    = document.getElementById('minHzVal');
+  const maxHzRange  = document.getElementById('maxHzRange');
+  const maxHzVal    = document.getElementById('maxHzVal');
+  const tunerMinRange = document.getElementById('tunerMinRange');
+  const tunerMinVal   = document.getElementById('tunerMinVal');
+  const tunerMaxRange = document.getElementById('tunerMaxRange');
+  const tunerMaxVal   = document.getElementById('tunerMaxVal');
+  const noteNames     = document.getElementById('noteNames');
+  const pcdRmsRange   = document.getElementById('pcdRmsRange');
+  const pcdRmsVal     = document.getElementById('pcdRmsVal');
+  const pcdThreshRange = document.getElementById('pcdThreshRange');
+  const pcdThreshVal   = document.getElementById('pcdThreshVal');
+  const pcdNormRange   = document.getElementById('pcdNormRange');
+  const pcdNormVal     = document.getElementById('pcdNormVal');
+
+  // Note naming convention change
+  noteNames.addEventListener('change', () => {
+    const convention = noteNames.value;
+    currentNoteLabels = NOTE_LABELS[convention];
+    // Redraw immediately to show new labels
+    if (window.currentPCD) {
+      drawRing(window.currentPCD);
+    }
+  });
 
   reactRange.addEventListener('input', () => {
     TUNER.reactivity = parseFloat(reactRange.value);
@@ -238,21 +455,77 @@
     TUNER.minRMS = parseFloat(rmsRange.value);
     rmsVal.textContent = TUNER.minRMS.toFixed(4);
   });
+  refA4Input.addEventListener('input', () => {
+    const value = parseFloat(refA4Input.value);
+    if (value >= 400 && value <= 480) { // validate range
+      REF_A4 = value;
+    }
+  });
+  windowRange.addEventListener('input', () => {
+    const exp = parseInt(windowRange.value);
+    WINDOW_SIZE = Math.pow(2, exp);
+    windowVal.textContent = WINDOW_SIZE.toString();
+  });
+  hopRange.addEventListener('input', () => {
+    const exp = parseInt(hopRange.value);
+    HOP_SIZE = Math.pow(2, exp);
+    hopVal.textContent = HOP_SIZE.toString();
+  });
+  smoothRange.addEventListener('input', () => {
+    SMOOTHING = parseFloat(smoothRange.value);
+    smoothVal.textContent = SMOOTHING.toFixed(2);
+  });
+  minHzRange.addEventListener('input', () => {
+    MIN_HZ = parseFloat(minHzRange.value);
+    minHzVal.textContent = MIN_HZ.toFixed(0) + ' Hz';
+  });
+  maxHzRange.addEventListener('input', () => {
+    MAX_HZ = parseFloat(maxHzRange.value);
+    maxHzVal.textContent = MAX_HZ.toFixed(0) + ' Hz';
+  });
+  tunerMinRange.addEventListener('input', () => {
+    TUNER.minHz = parseFloat(tunerMinRange.value);
+    tunerMinVal.textContent = TUNER.minHz.toFixed(0) + ' Hz';
+  });
+  tunerMaxRange.addEventListener('input', () => {
+    TUNER.maxHz = parseFloat(tunerMaxRange.value);
+    tunerMaxVal.textContent = TUNER.maxHz.toFixed(0) + ' Hz';
+  });
+  pcdRmsRange.addEventListener('input', () => {
+    PCD_MIN_RMS = parseFloat(pcdRmsRange.value);
+    pcdRmsVal.textContent = PCD_MIN_RMS.toFixed(4);
+  });
+  pcdThreshRange.addEventListener('input', () => {
+    PCD_THRESHOLD = parseFloat(pcdThreshRange.value);
+    pcdThreshVal.textContent = PCD_THRESHOLD.toFixed(3);
+  });
+  pcdNormRange.addEventListener('input', () => {
+    PCD_NORMALIZE = parseFloat(pcdNormRange.value);
+    pcdNormVal.textContent = PCD_NORMALIZE.toFixed(1);
+  });
 
-  function fitCanvas(){
-    const dpr = Math.max(1, window.devicePixelRatio || 1);
-    const css = canvas.getBoundingClientRect();
-    canvas.width  = Math.round(css.width * dpr);
-    canvas.height = Math.round(css.height * dpr);
-    ctx.setTransform(dpr,0,0,dpr,0,0); // draw in CSS pixels
-  }
-  new ResizeObserver(fitCanvas).observe(canvas);
-
-  // ===== Ring drawing =====
+  // ===== Ring drawing variables =====
   let userRotation = 0; // radians
   let needleAngleSm = null; // smoothed angle (radians)
   let centsSm = null;       // smoothed cents display
   let lastPrimary = null;   // raw latest reading for UI
+
+  function setupCanvas(){
+    // Set canvas to a fixed square size for simplicity
+    const size = Math.min(window.innerWidth - 40, window.innerHeight - 200, 720);
+    canvas.width = size;
+    canvas.height = size;
+    canvas.style.width = size + 'px';
+    canvas.style.height = size + 'px';
+    
+    // Handle high DPI displays
+    const dpr = window.devicePixelRatio || 1;
+    if (dpr > 1) {
+      canvas.width = size * dpr;
+      canvas.height = size * dpr;
+      ctx.scale(dpr, dpr);
+    }
+  }
 
   function wedgePath(cx, cy, rInner, rOuter, a0, a1){
     const p = new Path2D();
@@ -304,9 +577,9 @@
       const ly = cy + Math.sin(mid)*rLabel;
 
       ctx.lineWidth = Math.max(2, fontPx/5);
-      ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.strokeText(NOTE_LABELS[i], lx, ly);
-      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.strokeText(NOTE_LABELS[i], lx, ly);
-      ctx.fillStyle = 'currentColor'; ctx.fillText(NOTE_LABELS[i], lx, ly);
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.strokeText(currentNoteLabels[i], lx, ly);
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.strokeText(currentNoteLabels[i], lx, ly);
+      ctx.fillStyle = 'currentColor'; ctx.fillText(currentNoteLabels[i], lx, ly);
 
       // subtle dot for black keys
       if (IS_BLACK[i]){
@@ -388,6 +661,7 @@
 
   // ===== Public hook =====
   window.currentPCD = new Float32Array(12);
+  window.drawPending = false; // for throttled drawing
 
   // ===== Audio + analysis =====
   let audioContext, workletNode, micStream, running=false, sampleRate=48000;
@@ -421,8 +695,9 @@
     workletNode = new AudioWorkletNode(audioContext, 'tap');
     src.connect(workletNode).connect(silent).connect(audioContext.destination);
 
-    const ringBuf = new Float32Array(WINDOW_SIZE);
-    const windowFn = hann(WINDOW_SIZE);
+    let ringBuf = new Float32Array(WINDOW_SIZE);
+    let windowFn = hann(WINDOW_SIZE);
+    let analysisBuf = new Float32Array(WINDOW_SIZE); // pre-allocate
     let writeIdx = 0, filled = 0, hopCount = 0;
 
     workletNode.port.onmessage = (ev) => {
@@ -440,24 +715,37 @@
     };
 
     function analyze(){
-      // rebuild contiguous window
+      // Check if we need to reallocate buffers (window size changed)
+      if (ringBuf.length !== WINDOW_SIZE) {
+        ringBuf = new Float32Array(WINDOW_SIZE);
+        windowFn = hann(WINDOW_SIZE);
+        analysisBuf = new Float32Array(WINDOW_SIZE);
+        writeIdx = 0; filled = 0; // reset
+        return; // skip this frame
+      }
+      
+      // rebuild contiguous window (reuse buffer)
       const start = writeIdx % WINDOW_SIZE;
-      const buf = new Float32Array(WINDOW_SIZE);
       const first = ringBuf.subarray(start);
-      buf.set(first, 0);
-      buf.set(ringBuf.subarray(0, start), first.length);
+      analysisBuf.set(first, 0);
+      analysisBuf.set(ringBuf.subarray(0, start), first.length);
 
-      // windowing
-      for (let i=0;i<WINDOW_SIZE;i++) buf[i] *= windowFn[i];
+      // windowing (in-place)
+      for (let i = 0; i < WINDOW_SIZE; i++) analysisBuf[i] *= windowFn[i];
 
       // For gating + tuner
-      const rms = frameRms(buf);
+      const rms = frameRms(analysisBuf);
 
       // FFT
-      const mags = fftReal(buf);
+      const mags = fftReal(analysisBuf);
 
-      // PCD
-      const pcd = spectrumToPCD(mags, sampleRate, REF_A4, MIN_HZ, MAX_HZ);
+      // PCD (only if above RMS threshold)
+      let pcd;
+      if (rms >= PCD_MIN_RMS) {
+        pcd = spectrumToPCD(mags, sampleRate, REF_A4, MIN_HZ, MAX_HZ);
+      } else {
+        pcd = new Float32Array(12); // silent frame = zero PCD
+      }
 
       // Smooth PCD
       for (let i=0;i<12;i++){
@@ -494,21 +782,24 @@
         }
       }
 
-      // UI
-      pcdText.textContent = '[' + Array.from(window.currentPCD).map(v=>v.toFixed(3)).join(', ') + ']';
-      drawRing(window.currentPCD);
+      // Throttled UI updates (reduce draw calls)
+      if (!window.drawPending) {
+        window.drawPending = true;
+        requestAnimationFrame(() => {
+          pcdText.textContent = '[' + Array.from(window.currentPCD).map(v=>v.toFixed(3)).join(', ') + ']';
+          drawRing(window.currentPCD);
+          window.drawPending = false;
+        });
+      }
 
       if (lastPrimary){
-        const name = NOTE_LABELS[lastPrimary.pc];
+        const name = currentNoteLabels[lastPrimary.pc];
         const centsStr = (lastPrimary.centsSm>=0?'+':'') + lastPrimary.centsSm.toFixed(1);
         tuneEl.textContent = `Primary: ${name}  ${centsStr}¢  (~${lastPrimary.freq.toFixed(1)} Hz, ${lastPrimary.confDb.toFixed(1)} dB)`;
       } else {
-        // slowly fade needle toward null if no reading
-        if (needleAngleSm != null){
-          // optional slow decay: reduce influence
-          // Here we simply keep last angle; or uncomment to decay:
-          // needleAngleSm = null; centsSm = null;
-        }
+        // Hide needle when no active pitch detected
+        needleAngleSm = null;
+        centsSm = null;
         tuneEl.textContent = '';
       }
 
@@ -518,7 +809,7 @@
       statusEl.textContent = `Running @ ${sampleRate} Hz | N=${WINDOW_SIZE} hop=${HOP_SIZE}`;
     }
 
-    fitCanvas();
+    setupCanvas();
     drawRing(window.currentPCD);
   }
 
@@ -533,12 +824,40 @@
   startBtn.addEventListener('click', start, { passive: true });
   stopBtn.addEventListener('click', stop, { passive: true });
 
-  // Initial canvas setup + reflect slider defaults
-  fitCanvas(); 
+  // Initial setup
+  setupCanvas();
+  drawRing(new Float32Array(12)); // Draw empty ring immediately
+  
+  // Set slider positions to match JavaScript defaults
+  document.getElementById('reactRange').value = TUNER.reactivity;
+  document.getElementById('promRange').value = TUNER.minProminence;
+  document.getElementById('rmsRange').value = TUNER.minRMS;
+  document.getElementById('refA4Input').value = REF_A4;
+  document.getElementById('windowRange').value = Math.log2(WINDOW_SIZE);
+  document.getElementById('hopRange').value = Math.log2(HOP_SIZE);
+  document.getElementById('smoothRange').value = SMOOTHING;
+  document.getElementById('minHzRange').value = MIN_HZ;
+  document.getElementById('maxHzRange').value = MAX_HZ;
+  document.getElementById('tunerMinRange').value = TUNER.minHz;
+  document.getElementById('tunerMaxRange').value = TUNER.maxHz;
+  document.getElementById('pcdRmsRange').value = PCD_MIN_RMS;
+  document.getElementById('pcdThreshRange').value = PCD_THRESHOLD;
+  document.getElementById('pcdNormRange').value = PCD_NORMALIZE;
+  
+  // Reflect slider defaults in UI text
   document.getElementById('reactVal').textContent = TUNER.reactivity.toFixed(2);
-  document.getElementById('promVal').textContent  = TUNER.minProminence.toFixed(1) + ' dB';
-  document.getElementById('rmsVal').textContent   = TUNER.minRMS.toFixed(4);
-  drawRing(new Float32Array(12));
+  document.getElementById('promVal').textContent = TUNER.minProminence.toFixed(1) + ' dB';
+  document.getElementById('rmsVal').textContent = TUNER.minRMS.toFixed(4);
+  document.getElementById('windowVal').textContent = WINDOW_SIZE.toString();
+  document.getElementById('hopVal').textContent = HOP_SIZE.toString();
+  document.getElementById('smoothVal').textContent = SMOOTHING.toFixed(2);
+  document.getElementById('minHzVal').textContent = MIN_HZ.toFixed(0) + ' Hz';
+  document.getElementById('maxHzVal').textContent = MAX_HZ.toFixed(0) + ' Hz';
+  document.getElementById('tunerMinVal').textContent = TUNER.minHz.toFixed(0) + ' Hz';
+  document.getElementById('tunerMaxVal').textContent = TUNER.maxHz.toFixed(0) + ' Hz';
+  document.getElementById('pcdRmsVal').textContent = PCD_MIN_RMS.toFixed(4);
+  document.getElementById('pcdThreshVal').textContent = PCD_THRESHOLD.toFixed(3);
+  document.getElementById('pcdNormVal').textContent = PCD_NORMALIZE.toFixed(1);
 </script>
 </body>
 </html>

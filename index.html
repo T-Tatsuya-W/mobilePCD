@@ -622,22 +622,12 @@
     p.closePath();
     return p;
   }
-  // Detect dark mode and adjust colors accordingly
-  function isDarkMode() {
-    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  }
-  
-  function pcFillColor(i){ 
-    const lightness = isDarkMode() ? COLOR.darkMode : COLOR.lightMode;
-    return `hsl(${PC_HUE(i)} ${COLOR.sat}% ${lightness}%)`; 
-  }
-  
-  function slotBgColor(i){ 
-    const lightness = isDarkMode() ? COLOR.darkMode : COLOR.lightMode;
-    return `hsla(${PC_HUE(i)} ${COLOR.sat}% ${lightness}%, ${SLOT_BG_ALPHA})`; 
-  }
+  function pcFillColor(i){ return `hsl(${PC_HUE(i)} ${COLOR.sat}% ${COLOR.light}%)`; }
+  function slotBgColor(i){ return `hsla(${PC_HUE(i)} ${COLOR.sat}% ${COLOR.light}%, ${SLOT_BG_ALPHA})`; }
 
   function drawRing(pcd){
+    if (!pcd) pcd = new Float32Array(12); // safety check
+    
     const { width, height } = canvas.getBoundingClientRect();
     const cx = width/2, cy = height/2;
     const rMin = Math.min(width, height)/2;
@@ -663,10 +653,10 @@
       ctx.fillStyle = slotBgColor(i);
       ctx.fill(wedgePath(cx, cy, rInner, rOuter, a0, a1));
 
-      // active value
+      // active value - show even small values for testing
       const val = pcd[i];
-      if (val > 0.001){
-        const rVal = rInner + val*(rOuter - rInner);
+      if (val > 0.0001 || i === 0){ // always show C for testing
+        const rVal = rInner + Math.max(val, 0.1)*(rOuter - rInner);
         ctx.fillStyle = pcFillColor(i);
         ctx.fill(wedgePath(cx, cy, rInner, rVal, a0, a1));
       }
@@ -688,7 +678,8 @@
         ctx.arc(cx + Math.cos(mid)*(rInner + (rOuter-rInner)*0.5),
                 cy + Math.sin(mid)*(rInner + (rOuter-rInner)*0.5),
                 dotR, 0, Math.PI*2);
-        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        // Use a color that works in both light and dark modes
+        ctx.fillStyle = 'color-mix(in oklab, currentColor 40%, transparent)';
         ctx.fill();
       }
     }

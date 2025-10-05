@@ -18,6 +18,13 @@
       overflow: hidden;
     }
   }
+  
+  @media (max-width: 899px) {
+    body {
+      min-height: 100svh;
+      overflow-y: auto;
+    }
+  }
   header, footer{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
   button{
     padding:12px 14px; border-radius:12px; border:1px solid #888; background:transparent; cursor:pointer;
@@ -89,8 +96,15 @@
   
   @media (max-width: 899px) {
     canvas, .placeholder {
-      width: min(90vw, 35vh);
-      height: min(90vw, 35vh);
+      width: calc(100vw - 24px); /* Full width minus body padding */
+      height: calc(100vw - 24px);
+      max-width: 500px; /* Reasonable maximum size */
+      max-height: 500px;
+    }
+    
+    .visualizations {
+      gap: 24px;
+      padding: 12px 0;
     }
   }
   code{ background:#0001; padding:3px 6px; border-radius:6px }
@@ -608,8 +622,20 @@
     p.closePath();
     return p;
   }
-  function pcFillColor(i){ return `hsl(${PC_HUE(i)} ${COLOR.sat}% ${COLOR.light}%)`; }
-  function slotBgColor(i){ return `hsla(${PC_HUE(i)} ${COLOR.sat}% ${COLOR.light}%, ${SLOT_BG_ALPHA})`; }
+  // Detect dark mode and adjust colors accordingly
+  function isDarkMode() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  
+  function pcFillColor(i){ 
+    const lightness = isDarkMode() ? COLOR.darkMode : COLOR.lightMode;
+    return `hsl(${PC_HUE(i)} ${COLOR.sat}% ${lightness}%)`; 
+  }
+  
+  function slotBgColor(i){ 
+    const lightness = isDarkMode() ? COLOR.darkMode : COLOR.lightMode;
+    return `hsla(${PC_HUE(i)} ${COLOR.sat}% ${lightness}%, ${SLOT_BG_ALPHA})`; 
+  }
 
   function drawRing(pcd){
     const { width, height } = canvas.getBoundingClientRect();
@@ -907,6 +933,20 @@
     setupCanvas();
     drawRing(window.currentPCD);
   });
+  
+  // Handle color scheme changes (light/dark mode)
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      drawRing(window.currentPCD);
+    });
+  }
+  
+  // Handle color scheme changes (light/dark mode)
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      drawRing(window.currentPCD);
+    });
+  }
   
   // Set slider positions to match JavaScript defaults
   document.getElementById('reactRange').value = TUNER.reactivity;

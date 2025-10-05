@@ -18,6 +18,13 @@
       overflow: hidden;
     }
   }
+  
+  @media (max-width: 899px) {
+    body {
+      min-height: 100svh;
+      overflow-y: auto;
+    }
+  }
   header, footer{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
   button{
     padding:12px 14px; border-radius:12px; border:1px solid #888; background:transparent; cursor:pointer;
@@ -55,6 +62,13 @@
     width: 100%;
   }
   
+  @media (max-width: 899px) {
+    .vis-container {
+      width: 100%;
+      justify-items: stretch;
+    }
+  }
+  
   canvas, .placeholder {
     aspect-ratio: 1;
     border-radius: 16px;
@@ -89,8 +103,15 @@
   
   @media (max-width: 899px) {
     canvas, .placeholder {
-      width: min(90vw, 35vh);
-      height: min(90vw, 35vh);
+      width: calc(100vw - 48px); /* Full width minus body padding */
+      height: calc(100vw - 48px); /* Square aspect ratio */
+      max-width: 600px;
+      max-height: 600px;
+    }
+    
+    .visualizations {
+      padding: 0;
+      gap: 20px;
     }
   }
   code{ background:#0001; padding:3px 6px; border-radius:6px }
@@ -664,16 +685,7 @@
       ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.strokeText(currentNoteLabels[i], lx, ly);
       ctx.fillStyle = '#333333'; ctx.fillText(currentNoteLabels[i], lx, ly);
 
-      // prominent dot for black keys
-      if (IS_BLACK[i]){
-        const dotR = Math.max(3, rMin*0.015);
-        ctx.beginPath();
-        ctx.arc(cx + Math.cos(mid)*(rInner + (rOuter-rInner)*0.5),
-                cy + Math.sin(mid)*(rInner + (rOuter-rInner)*0.5),
-                dotR, 0, Math.PI*2);
-        ctx.fillStyle = 'rgba(30,30,30,0.9)'; // Much darker dot for black keys
-        ctx.fill();
-      }
+      // Black key indication removed - using background colors instead
     }
 
     // Draw tuning needle (smoothed angle)

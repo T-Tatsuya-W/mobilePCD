@@ -18,13 +18,6 @@
       overflow: hidden;
     }
   }
-  
-  @media (max-width: 899px) {
-    body {
-      min-height: 100svh;
-      overflow-y: auto;
-    }
-  }
   header, footer{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
   button{
     padding:12px 14px; border-radius:12px; border:1px solid #888; background:transparent; cursor:pointer;
@@ -96,15 +89,8 @@
   
   @media (max-width: 899px) {
     canvas, .placeholder {
-      width: calc(100vw - 24px); /* Full width minus body padding */
-      height: calc(100vw - 24px);
-      max-width: 500px; /* Reasonable maximum size */
-      max-height: 500px;
-    }
-    
-    .visualizations {
-      gap: 24px;
-      padding: 12px 0;
+      width: min(90vw, 35vh);
+      height: min(90vw, 35vh);
     }
   }
   code{ background:#0001; padding:3px 6px; border-radius:6px }
@@ -279,10 +265,10 @@
     mixed:  ['C','C#/Db','D','D#/Eb','E','F','F#/Gb','G','G#/Ab','A','A#/Bb','B']
   };
   let currentNoteLabels = NOTE_LABELS.sharps; // default
-  const IS_BLACK    = [true,false,true,false,false,true,false,true,false,true,false,false]; // C#,D,D#,E,F,F#,G,G#,A,A#,B,C
+  const IS_BLACK    = [false,true,false,true,false,false,true,false,true,false,true,false]; // C#,D,D#,E,F,F#,G,G#,A,A#,B,C
   const COLOR = { startHue: 0, sat: 80, light: 55 };
   const PC_HUE = i => (COLOR.startHue + i * 30) % 360;
-  const SLOT_BG_ALPHA = 0.10;
+  const SLOT_BG_ALPHA = 0.15;
 
   // Tuning needle defaults (some are user-adjustable below)
   const TUNER = {
@@ -623,11 +609,18 @@
     return p;
   }
   function pcFillColor(i){ return `hsl(${PC_HUE(i)} ${COLOR.sat}% ${COLOR.light}%)`; }
-  function slotBgColor(i){ return `hsla(${PC_HUE(i)} ${COLOR.sat}% ${COLOR.light}%, ${SLOT_BG_ALPHA})`; }
+  function slotBgColor(i){ 
+    if (IS_BLACK[i]) {
+      // Black keys: extremely dark, nearly pure black
+      return 'rgba(5, 5, 5, 0.85)';
+    } else {
+      // White keys: extremely light, nearly pure white with tiny hue hint
+      const hue = PC_HUE(i);
+      return `hsla(${hue}, 10%, 98%, 0.7)`;
+    }
+  }
 
   function drawRing(pcd){
-    if (!pcd) pcd = new Float32Array(12); // safety check
-    
     const { width, height } = canvas.getBoundingClientRect();
     const cx = width/2, cy = height/2;
     const rMin = Math.min(width, height)/2;
@@ -653,10 +646,10 @@
       ctx.fillStyle = slotBgColor(i);
       ctx.fill(wedgePath(cx, cy, rInner, rOuter, a0, a1));
 
-      // active value - show even small values for testing
+      // active value
       const val = pcd[i];
-      if (val > 0.0001 || i === 0){ // always show C for testing
-        const rVal = rInner + Math.max(val, 0.1)*(rOuter - rInner);
+      if (val > 0.001){
+        const rVal = rInner + val*(rOuter - rInner);
         ctx.fillStyle = pcFillColor(i);
         ctx.fill(wedgePath(cx, cy, rInner, rVal, a0, a1));
       }
@@ -667,19 +660,18 @@
       const ly = cy + Math.sin(mid)*rLabel;
 
       ctx.lineWidth = Math.max(2, fontPx/5);
-      ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.strokeText(currentNoteLabels[i], lx, ly);
-      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.strokeText(currentNoteLabels[i], lx, ly);
-      ctx.fillStyle = 'currentColor'; ctx.fillText(currentNoteLabels[i], lx, ly);
+      ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.strokeText(currentNoteLabels[i], lx, ly);
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.strokeText(currentNoteLabels[i], lx, ly);
+      ctx.fillStyle = '#333333'; ctx.fillText(currentNoteLabels[i], lx, ly);
 
-      // subtle dot for black keys
+      // prominent dot for black keys
       if (IS_BLACK[i]){
-        const dotR = Math.max(2, rMin*0.01);
+        const dotR = Math.max(3, rMin*0.015);
         ctx.beginPath();
         ctx.arc(cx + Math.cos(mid)*(rInner + (rOuter-rInner)*0.5),
                 cy + Math.sin(mid)*(rInner + (rOuter-rInner)*0.5),
                 dotR, 0, Math.PI*2);
-        // Use a color that works in both light and dark modes
-        ctx.fillStyle = 'color-mix(in oklab, currentColor 40%, transparent)';
+        ctx.fillStyle = 'rgba(30,30,30,0.9)'; // Much darker dot for black keys
         ctx.fill();
       }
     }
@@ -924,20 +916,6 @@
     setupCanvas();
     drawRing(window.currentPCD);
   });
-  
-  // Handle color scheme changes (light/dark mode)
-  if (window.matchMedia) {
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-      drawRing(window.currentPCD);
-    });
-  }
-  
-  // Handle color scheme changes (light/dark mode)
-  if (window.matchMedia) {
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-      drawRing(window.currentPCD);
-    });
-  }
   
   // Set slider positions to match JavaScript defaults
   document.getElementById('reactRange').value = TUNER.reactivity;

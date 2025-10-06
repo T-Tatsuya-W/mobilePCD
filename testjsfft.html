@@ -138,20 +138,45 @@
       ctx.stroke();
     }
 
-    function reduceCoefficients(amplitude, phase, keepBins = [0, 3, 5, 7, 9], unitBins = [5, 7]) {
-      const N = amplitude.length;
-      const ampR = new Array(N).fill(0);
-      const phaseR = new Array(N).fill(0);
+    function reduceCoefficients(amplitude, phase) {
+  const N = amplitude.length;
+  const ampR = new Array(N).fill(0);
+  const phaseR = new Array(N).fill(0);
 
-      const keep = new Set(keepBins.filter(k => k >= 0 && k < N));
-      const forceUnit = new Set(unitBins.filter(k => k >= 0 && k < N));
+  const inRange = k => k >= 0 && k < N;
 
-      for (let k of keep) {
-        ampR[k] = forceUnit.has(k) ? 1 : amplitude[k];
-        phaseR[k] = phase[k];
-      }
-      return { ampR, phaseR };
-    }
+  // Bin 0 (DC)
+  if (inRange(0)) {
+    ampR[0] = amplitude[0];
+    phaseR[0] = phase[0];
+  }
+
+  // Bin 3: copy from source
+  if (inRange(3)) {
+    ampR[3] = amplitude[3];
+    phaseR[3] = phase[3];
+  }
+
+  // Bin 5: force magnitude 1, keep original phase
+  if (inRange(5)) {
+    ampR[5] = 1;
+    phaseR[5] = phase[5];
+  }
+
+  // Bin 7: force magnitude 1, phase copied from bin 5
+  if (inRange(7)) {
+    ampR[7] = 1;
+    phaseR[7] = inRange(5) ? phase[5] : phase[7];
+  }
+
+  // Bin 9: magnitude copied from bin 3, phase copied from bin 3
+  if (inRange(9)) {
+    ampR[9] = inRange(3) ? amplitude[3] : amplitude[9];
+    phaseR[9] = inRange(3) ? phase[3] : phase[9];
+  }
+
+  return { ampR, phaseR };
+}
 
     // UI wiring
     const forwardBtn = document.getElementById('forwardBtn');

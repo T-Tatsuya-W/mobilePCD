@@ -2,6 +2,11 @@
 
 A web-based real-time audio analyzer that visualizes pitch class distribution (PCD) in a circular format with an integrated precision tuning needle. Perfect for musicians, music educators, and audio analysis enthusiasts.
 
+## dft and idft expected results from amicad paper
+<img width="643" height="304" alt="image" src="https://github.com/user-attachments/assets/ca802824-69fc-4caa-8896-c9e92884f369" />
+
+
+
 ## 🎵 Features
 
 ### Visual Components

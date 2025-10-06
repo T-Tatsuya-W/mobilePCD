@@ -393,6 +393,7 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
   let currentRMS = 0; // Track current audio RMS level
   let audioTrailPositions = []; // Array to store previous audio positions
   let audioTrailLine = null; // Three.js line object for trail visualization
+  let guideLines = { pha5Line: null, pha3Line: null }; // Guide lines for coordinate visualization
   let mouse3D = { x: 0, y: 0 };
   let isMouseDown3D = false;
   let rotationMatrix = new THREE.Matrix4(); // Accumulate rotations in world space
@@ -924,6 +925,7 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
       // Check if audio is active (same threshold as PCD computation)
       if (rms < PCD_MIN_RMS) {
         clearAudioTrail(); // Clear trail when audio is not active
+        clearGuideLines();  // Clear guide lines when audio is not active
         return; // Hide sphere when audio is not active
       }
       
@@ -949,6 +951,9 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
       
       // Add current position to trail and update trail visualization
       addToAudioTrail(position);
+      
+      // Update guide lines to show coordinate system
+      updateGuideLines(pha5, pha3, mag3, position);
     } catch (error) {
       console.error('Error updating audio position in torus:', error);
     }
@@ -1041,6 +1046,64 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
     if (audioTrailLine) {
       torusContainer3D.remove(audioTrailLine);
       audioTrailLine = null;
+    }
+  }
+  
+  function updateGuideLines(pha5, pha3, mag3, spherePosition) {
+    if (!torusContainer3D) return;
+    
+    try {
+      // Clear existing guide lines
+      clearGuideLines();
+      
+      // Calculate tube center position at current pha5 (pha3=0, mag3=0)
+      const tubeCenterPosition = toroidalToCartesian(pha5, 0, 0);
+      
+      // Create pha5 guide line: from torus center (0,0,0) to tube center
+      const pha5Points = [
+        new THREE.Vector3(0, 0, 0),  // Torus center
+        tubeCenterPosition           // Tube center at current pha5
+      ];
+      const pha5Geometry = new THREE.BufferGeometry().setFromPoints(pha5Points);
+      const pha5Material = new THREE.LineBasicMaterial({ 
+        color: 0xff4444,      // Red for pha5
+        opacity: 0.7,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false
+      });
+      guideLines.pha5Line = new THREE.Line(pha5Geometry, pha5Material);
+      torusContainer3D.add(guideLines.pha5Line);
+      
+      // Create pha3/mag3 guide line: from tube center to sphere position
+      const pha3Points = [
+        tubeCenterPosition,  // Tube center
+        spherePosition       // Current audio sphere position
+      ];
+      const pha3Geometry = new THREE.BufferGeometry().setFromPoints(pha3Points);
+      const pha3Material = new THREE.LineBasicMaterial({ 
+        color: 0x44ff44,      // Green for pha3/mag3
+        opacity: 0.7,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false
+      });
+      guideLines.pha3Line = new THREE.Line(pha3Geometry, pha3Material);
+      torusContainer3D.add(guideLines.pha3Line);
+      
+    } catch (error) {
+      console.error('Error updating guide lines:', error);
+    }
+  }
+  
+  function clearGuideLines() {
+    if (guideLines.pha5Line) {
+      torusContainer3D.remove(guideLines.pha5Line);
+      guideLines.pha5Line = null;
+    }
+    if (guideLines.pha3Line) {
+      torusContainer3D.remove(guideLines.pha3Line);
+      guideLines.pha3Line = null;
     }
   }
 

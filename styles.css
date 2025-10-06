@@ -28,6 +28,8 @@
   details.settings {
     border:1px solid color-mix(in oklab, currentColor 20%, transparent);
     border-radius:12px; padding:8px 12px;
+    max-height: 70vh;
+    overflow-y: auto;
   }
   .row{display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin:4px 0}
   .row label{min-width:11ch; opacity:.85}

@@ -5,12 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Mic → PCD (Ring + Tuning Needle + Reactivity)</title>
 <link rel="stylesheet" href="styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
   <header>
     <button id="start">Start mic</button>
     <button id="stop" disabled>Stop</button>
     <button id="resetRot" title="Reset ring rotation">Reset ring</button>
+    <a href="testjsfft2.html" target="_blank" title="Open DFT test page" style="display: inline-block; padding: 8px 12px; background: #444; color: white; text-decoration: none; border-radius: 4px; border: 1px solid #666; font: inherit; cursor: pointer;">🧪 Test DFT</a>
     <span id="status">Idle</span>
   </header>
 
@@ -121,6 +123,64 @@
       </select>
       <small>how to display black keys</small>
     </div>
+    
+    <!-- 3D VISUALIZATION SECTION -->
+    <h4 style="margin:16px 0 8px 0; opacity:0.8; border-bottom:1px solid color-mix(in oklab, currentColor 20%, transparent); padding-bottom:4px;">🌐 3D Visualization</h4>
+    <div class="row">
+      <label for="show3DData">Show in Torus</label>
+      <select id="show3DData" style="padding:8px; border-radius:8px; border:1px solid #888; background:transparent; color:currentColor; min-width:140px;">
+        <option value="notes">Notes Only</option>
+        <option value="chords">Chords Only</option>
+        <option value="both">Both Notes & Chords</option>
+        <option value="neither">Neither (Empty Torus)</option>
+      </select>
+      <small>what data to display in the 3D torus</small>
+    </div>
+    <div class="row">
+      <label for="waypointSize">Waypoint Size</label>
+      <input id="waypointSize" type="range" min="0.01" max="0.15" step="0.005" value="0.05">
+      <span id="waypointSizeVal">0.050</span>
+      <small>size of the 3D waypoint markers in the torus</small>
+    </div>
+    <div class="row">
+      <label for="trailLength">Audio Trail Length</label>
+      <input id="trailLength" type="range" min="0" max="50" step="1" value="10">
+      <span id="trailLengthVal">10</span>
+      <small>number of previous audio positions to show as trail</small>
+    </div>
+    
+    <!-- DATA DISPLAY SECTION -->
+    <h4 style="margin:16px 0 8px 0; opacity:0.8; border-bottom:1px solid color-mix(in oklab, currentColor 20%, transparent); padding-bottom:4px;">📊 Real-time Data</h4>
+    <div class="row">
+      <label>PCD Values</label>
+      <div style="font-family: monospace; font-size: 11px; background: rgba(255,255,255,0.1); padding: 8px; border-radius: 4px; overflow-x: auto;">
+        <code id="pcdText">[0,0,0,0,0,0,0,0,0,0,0,0]</code>
+      </div>
+      <small>pitch class distribution (C through B)</small>
+    </div>
+    <div class="row">
+      <label>DFT Coefficients</label>
+      <div style="font-family: monospace; font-size: 10px; line-height: 1.3; background: rgba(255,255,255,0.1); padding: 8px; border-radius: 4px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <div style="font-weight: bold; margin-bottom: 4px; opacity: 0.8;">Magnitudes:</div>
+            <div id="dft-magnitudes"></div>
+          </div>
+          <div>
+            <div style="font-weight: bold; margin-bottom: 4px; opacity: 0.8;">Phases:</div>
+            <div id="dft-phases"></div>
+          </div>
+        </div>
+      </div>
+      <small>frequency domain representation of PCD</small>
+    </div>
+    <div class="row">
+      <label>Primary Note</label>
+      <div style="font-family: monospace; font-size: 12px; background: rgba(255,255,255,0.1); padding: 8px; border-radius: 4px; min-height: 24px;">
+        <span id="tuneReadout" style="opacity: 0.9;"></span>
+      </div>
+      <small>detected primary note and tuning information</small>
+    </div>
   </details>
 
   <div class="visualizations">
@@ -128,19 +188,21 @@
       <canvas id="ring"></canvas>
     </div>
     <div class="vis-container">
-      <div class="placeholder">
-        <div>
-          <div style="font-size: 2em; margin-bottom: 8px;">🚧</div>
-          <div>Work in Progress</div>
-          <div style="font-size: 0.8em; margin-top: 4px; opacity: 0.7;">Second visualization coming soon</div>
+      <div id="cube-container" style="position: relative; width: 100%; height: 100%; overflow: hidden;">
+        <canvas id="cubeCanvas" style="display: block; width: 100%; height: 100%;"></canvas>
+        <div style="position: absolute; top: 10px; left: 10px; font-size: 12px; opacity: 0.7; pointer-events: none; z-index: 10;">
+          3D Torus Visualization<br>
+          <small>Click and drag to rotate</small>
         </div>
+        <button id="reset3D" style="position: absolute; top: 10px; right: 10px; padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.3); background: rgba(0,0,0,0.5); color: white; cursor: pointer; font-size: 11px; z-index: 10; backdrop-filter: blur(4px);" title="Reset torus orientation">
+          ↻ Reset
+        </button>
       </div>
     </div>
   </div>
 
   <footer style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
-    <div><strong>PCD (C..B):</strong> <code id="pcdText">[0,0,0,0,0,0,0,0,0,0,0,0]</code></div>
-    <div id="tuneReadout" style="opacity:.9"></div>
+    <!-- Clean footer - all data moved to settings -->
   </footer>
 
 <script type="module" src="script.js"></script>

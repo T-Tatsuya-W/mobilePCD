@@ -10,6 +10,8 @@
   h2 { margin: 0 0 1rem; }
   .row { display: flex; flex-wrap: wrap; gap: 6px; }
   input[type="number"] { width: 4.3rem; padding: 6px; text-align: right; }
+  input[type="number"].pcd-input { width: 2.5rem; padding: 4px; text-align: center; }
+  input[type="number"].freq-input { width: 4.3rem; }
   button { padding: 8px 14px; border: 0; border-radius: 8px; cursor: pointer; }
   button.primary { background: #4b8; color: #000; }
   button.secondary { background: #89c; color: #000; }
@@ -22,6 +24,51 @@
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
   .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  
+  .graph-container {
+    border: 1px solid #0003;
+    border-radius: 8px;
+    padding: 12px;
+    margin: 12px 0;
+  }
+  
+  .graph-container h4 {
+    margin: 0 0 8px 0;
+    font-size: 0.9em;
+    color: #666;
+  }
+  
+  canvas {
+    width: 100%;
+    height: 200px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fafafa;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    canvas {
+      background: #1a1a1a;
+      border-color: #444;
+    }
+  }
+  
+
+  
+  .filter-btn {
+    padding: 8px 16px;
+    background: #9b59b6;
+    color: white;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    margin-left: 10px;
+  }
+  
+  .filter-btn:hover {
+    background: #8e44ad;
+  }
 </style>
 </head>
 <body>
@@ -34,6 +81,11 @@
     <button class="primary" id="btnForward">Compute Forward (rFFT)</button>
     <span class="muted mono" id="normInfo"></span>
   </div>
+</div>
+
+<div class="graph-container">
+  <h4>Input Signal Visualization</h4>
+  <canvas id="inputCanvas" width="600" height="200"></canvas>
 </div>
 
 <div class="section grid">
@@ -49,6 +101,12 @@
 
 <div class="section">
   <button class="secondary" id="btnInverse">Reconstruct (iRFFT)</button>
+  <button class="filter-btn" id="btnFilter">Filter (keep k=0,3,5 only)</button>
+</div>
+
+<div class="graph-container">
+  <h4>Reconstructed Signal Visualization</h4>
+  <canvas id="reconstructedCanvas" width="600" height="200"></canvas>
 </div>
 
 <div class="section">
@@ -56,79 +114,39 @@
   <div id="results"></div>
 </div>
 
-<script>
-// ----------------------- Core math (n = 12) -----------------------
+<script type="module">
+// ===============================
+// === Import PCD-DFT Functions ===
+// ===============================
+
+// Import from external module (requires HTTP server)
+// If this fails, the functions are defined inline below as fallback
+import { pcdToFrequencyDomain, frequencyDomainToPcd, normalize12 } from './pcd-dft.js';
+
+// ===============================
+// === Constants ===
+// ===============================
+
 const N = 12;
-const M = Math.floor(N/2) + 1; // 7 outputs: k=0..6
-const TAU = 2 * Math.PI;
+const M = 7; // k=0..6
 
-// Real-input forward DFT truncated to non-negative freqs (rFFT)
-function rfft12(x) {
-  const out = new Array(M);
-  for (let k = 0; k < M; k++) {
-    let re = 0, im = 0;
-    const base = -TAU * k / N; // numpy default "backward" norm
-    for (let t = 0; t < N; t++) {
-      const ang = base * t;
-      re += x[t] * Math.cos(ang);
-      im += x[t] * Math.sin(ang);
-    }
-    out[k] = { re, im };
-  }
-  return out;
-}
+// ===============================
+// === Legacy Helper Functions ===
+// ===============================
 
-// Normalize 12-bin PCD to sum=1 (like your Python)
-function normalize12(arr) {
-  const s = arr.reduce((a,b)=>a+b,0);
-  return s === 0 ? arr.slice() : arr.map(v => v / s);
-}
-
-// Public: forward analysis → amplitudes & phases (k=0..6)
+// Wrapper for backward compatibility with existing UI code
 function getFourierComponent12(pcd) {
-  const x = normalize12(pcd);
-  const ft = rfft12(x);
-  const amp = new Array(M);
-  const phs = new Array(M);
-  for (let k = 0; k < M; k++) {
-    const { re, im } = ft[k];
-    amp[k] = Math.hypot(re, im);
-    phs[k] = Math.atan2(im, re);
-  }
-  return { amplitude: amp, phase: phs, normalizedInput: x };
+  const result = pcdToFrequencyDomain(pcd);
+  return {
+    amplitude: result.amplitudes,
+    phase: result.phases,
+    normalizedInput: result.normalizedInput
+  };
 }
 
-// Inverse: given amplitude & phase arrays (k=0..6), rebuild x[0..11]
+// Wrapper for backward compatibility with existing UI code
 function irfft12(amplitude, phase) {
-  // Build full Hermitian spectrum length N
-  const spec = new Array(N).fill(null).map(()=>({re:0, im:0}));
-
-  // Fill 0..M-1 directly from amp/phase
-  for (let k = 0; k < M; k++) {
-    const re = amplitude[k] * Math.cos(phase[k]);
-    const im = amplitude[k] * Math.sin(phase[k]);
-    spec[k] = { re, im };
-  }
-  // Mirror (complex conjugates) for k = 1..M-2
-  // Skip DC (k=0) and Nyquist (k=N/2 when N even; here k=6)
-  for (let k = 1; k < M - 1; k++) {
-    spec[N - k] = { re: spec[k].re, im: -spec[k].im };
-  }
-
-  // Inverse DFT (matches numpy irfft scaling): x_t = (1/N) * Σ_k X_k e^{i2πkt/N}
-  const x = new Array(N);
-  for (let t = 0; t < N; t++) {
-    let re = 0, im = 0;
-    for (let k = 0; k < N; k++) {
-      const ang = TAU * k * t / N;
-      const c = Math.cos(ang), s = Math.sin(ang);
-      const { re: a, im: b } = spec[k];
-      re += a * c - b * s;
-      im += a * s + b * c;
-    }
-    x[t] = re / N; // real part
-  }
-  return x;
+  return frequencyDomainToPcd(amplitude, phase);
 }
 
 // ----------------------- UI wiring -----------------------
@@ -138,6 +156,129 @@ const phaseDiv  = document.getElementById('phaseInputs');
 const resultsEl = document.getElementById('results');
 const normInfo  = document.getElementById('normInfo');
 
+// Canvas elements for graphs
+const inputCanvas = document.getElementById('inputCanvas');
+const reconstructedCanvas = document.getElementById('reconstructedCanvas');
+const inputCtx = inputCanvas.getContext('2d');
+const reconstructedCtx = reconstructedCanvas.getContext('2d');
+
+// Graph plotting function
+function plotSignal(canvas, ctx, data, title, color = '#4b8bf4') {
+  const width = canvas.width;
+  const height = canvas.height;
+  const padding = 40;
+  const plotWidth = width - 2 * padding;
+  const plotHeight = height - 2 * padding;
+  
+  // Clear canvas
+  ctx.clearRect(0, 0, width, height);
+  
+  // Find min/max for scaling
+  const minVal = Math.min(...data);
+  const maxVal = Math.max(...data);
+  const range = maxVal - minVal || 1; // avoid division by zero
+  
+  // Set up styling
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2;
+  ctx.font = '12px system-ui, sans-serif';
+  
+  // Draw axes
+  ctx.strokeStyle = '#666';
+  ctx.lineWidth = 1;
+  
+  // Y-axis
+  ctx.beginPath();
+  ctx.moveTo(padding, padding);
+  ctx.lineTo(padding, height - padding);
+  ctx.stroke();
+  
+  // X-axis
+  ctx.beginPath();
+  ctx.moveTo(padding, height - padding);
+  ctx.lineTo(width - padding, height - padding);
+  ctx.stroke();
+  
+  // Draw grid lines and labels
+  ctx.fillStyle = '#888';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  
+  // X-axis labels (0, 1, 2, ... 11)
+  for (let i = 0; i < data.length; i++) {
+    const x = padding + (i * plotWidth) / (data.length - 1);
+    ctx.fillText(i.toString(), x, height - padding + 5);
+    
+    // Grid lines
+    if (i > 0) {
+      ctx.strokeStyle = '#eee';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(x, padding);
+      ctx.lineTo(x, height - padding);
+      ctx.stroke();
+    }
+  }
+  
+  // Y-axis labels
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  
+  const yLabels = 5;
+  for (let i = 0; i <= yLabels; i++) {
+    const y = padding + (i * plotHeight) / yLabels;
+    const value = maxVal - (i * range) / yLabels;
+    ctx.fillText(value.toFixed(3), padding - 5, y);
+    
+    // Grid lines
+    if (i > 0 && i < yLabels) {
+      ctx.strokeStyle = '#eee';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(padding, y);
+      ctx.lineTo(width - padding, y);
+      ctx.stroke();
+    }
+  }
+  
+  // Draw data points and lines
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2;
+  
+  // Line plot
+  ctx.beginPath();
+  for (let i = 0; i < data.length; i++) {
+    const x = padding + (i * plotWidth) / (data.length - 1);
+    const y = padding + ((maxVal - data[i]) * plotHeight) / range;
+    
+    if (i === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
+  ctx.stroke();
+  
+  // Data points
+  for (let i = 0; i < data.length; i++) {
+    const x = padding + (i * plotWidth) / (data.length - 1);
+    const y = padding + ((maxVal - data[i]) * plotHeight) / range;
+    
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, 2 * Math.PI);
+    ctx.fill();
+  }
+  
+  // Title
+  ctx.fillStyle = '#333';
+  ctx.font = 'bold 14px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(title, width / 2, 5);
+}
+
 function numberInput(value, step="any") {
   const i = document.createElement('input');
   i.type = 'number';
@@ -146,19 +287,26 @@ function numberInput(value, step="any") {
   return i;
 }
 
-// 12 PCD inputs (simple ramp default)
+// 12 PCD inputs (chord-like pattern: C, E, G) - compact single digit inputs
 const pcdInputs = [];
+const initialValues = [1,0,0,0,1,0,0,1,0,0,0,0]; // C, E, G chord pattern
 for (let i = 0; i < N; i++) {
-  const inp = numberInput(i < 6 ? i : 0);
+  const inp = numberInput(initialValues[i]);
+  inp.className = 'pcd-input';
+  inp.min = '0';
+  inp.max = '9';
+  inp.step = '1';
   pcdInputs.push(inp);
   pcdDiv.appendChild(inp);
 }
 
-// Amp/Phase inputs (k=0..6)
+// Amp/Phase inputs (k=0..6) - clean and compact
 const ampInputs = [], phaseInputs = [];
 for (let k = 0; k < M; k++) {
   const a = numberInput(0, "any");
+  a.className = 'freq-input';
   const p = numberInput(0, "any");
+  p.className = 'freq-input';
   ampInputs.push(a); phaseInputs.push(p);
   ampDiv.appendChild(a); phaseDiv.appendChild(p);
 }
@@ -177,6 +325,12 @@ document.getElementById('btnForward').addEventListener('click', () => {
   const sum = normalizedInput.reduce((a,b)=>a+b,0);
   normInfo.textContent = `Normalized sum = ${sum.toFixed(6)} (should be 1.000000)`;
   renderResultsTable(normalizedInput, amplitude, phase, null, null);
+  
+  // Plot input signal
+  plotSignal(inputCanvas, inputCtx, normalizedInput, 'Input Signal (Normalized PCD)', '#4b8bf4');
+  
+  // Clear reconstructed canvas
+  reconstructedCtx.clearRect(0, 0, reconstructedCanvas.width, reconstructedCanvas.height);
 });
 
 // Inverse button
@@ -192,6 +346,31 @@ document.getElementById('btnInverse').addEventListener('click', () => {
   const xRec = irfft12(amp, phs);
   const { mae, rmse } = errorStats(xRef, xRec);
   renderResultsTable(xRef, amp, phs, xRec, { mae, rmse });
+  
+  // Plot both signals
+  plotSignal(inputCanvas, inputCtx, xRef, 'Input Signal (Normalized PCD)', '#4b8bf4');
+  plotSignal(reconstructedCanvas, reconstructedCtx, xRec, 'Reconstructed Signal (iRFFT)', '#f84b4b');
+});
+
+// Filter button - applies specific filtering pattern
+document.getElementById('btnFilter').addEventListener('click', () => {
+  for (let k = 0; k < M; k++) {
+    if (k === 0) {
+      // Keep k=0 as is (don't change amplitude or phase)
+      continue;
+    } else if (k === 3) {
+      // Keep k=3 as is (don't change amplitude or phase)
+      continue;
+    } else if (k === 5) {
+      // Keep k=5 phase, but set amplitude to 1
+      ampInputs[k].value = '1';
+      // Phase stays as is
+    } else {
+      // Set all other k values to 0 for both amplitude and phase (including k=1)
+      ampInputs[k].value = '0';
+      phaseInputs[k].value = '0';
+    }
+  }
 });
 
 // Helpers to render results
@@ -239,6 +418,11 @@ function renderResultsTable(xRef, amp, phs, xRec=null, err=null) {
 
 // Initial render (no results yet)
 renderResultsTable(new Array(N).fill(0), new Array(M).fill(0), new Array(M).fill(0));
+
+// Initialize graphs with default data
+const defaultPcd = pcdInputs.map(i => parseFloat(i.value) || 0);
+const { normalizedInput } = getFourierComponent12(defaultPcd);
+plotSignal(inputCanvas, inputCtx, normalizedInput, 'Input Signal (Normalized PCD)', '#4b8bf4');
 
 </script>
 </body>

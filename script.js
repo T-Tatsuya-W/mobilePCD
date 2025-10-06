@@ -247,6 +247,8 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
   // 3D visualization elements
   const cubeCanvas = document.getElementById('cubeCanvas');
   const reset3DBtn = document.getElementById('reset3D');
+  const fullscreen3DBtn = document.getElementById('fullscreen3D');
+  const cubeContainer = document.getElementById('cube-container');
   const show3DData = document.getElementById('show3DData');
   
 
@@ -750,6 +752,12 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
     // Reset button
     reset3DBtn.addEventListener('click', reset3DOrientation);
     
+    // Fullscreen button
+    fullscreen3DBtn.addEventListener('click', toggle3DFullscreen);
+    
+    // Zoom controls (mouse wheel and pinch)
+    cubeCanvas.addEventListener('wheel', handle3DZoom, { passive: false });
+    
     // 3D data selector
     show3DData.addEventListener('change', update3DVisualization);
     
@@ -872,6 +880,75 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
     requestAnimationFrame(render3D);
     renderer3D.render(scene3D, camera3D);
   }
+  
+  function toggle3DFullscreen() {
+    if (!document.fullscreenElement) {
+      // Enter fullscreen
+      cubeContainer.requestFullscreen().then(() => {
+        // Update camera and renderer for fullscreen
+        setTimeout(() => {
+          const rect = cubeContainer.getBoundingClientRect();
+          const size = Math.min(rect.width, rect.height);
+          camera3D.aspect = rect.width / rect.height;
+          camera3D.updateProjectionMatrix();
+          renderer3D.setSize(rect.width, rect.height);
+          fullscreen3DBtn.textContent = '⊞ Exit';
+        }, 100);
+      }).catch(err => {
+        console.error('Error entering fullscreen:', err);
+      });
+    } else {
+      // Exit fullscreen
+      document.exitFullscreen().then(() => {
+        setTimeout(() => {
+          onWindow3DResize();
+          fullscreen3DBtn.textContent = '⛶ Full';
+        }, 100);
+      });
+    }
+  }
+  
+  function handle3DZoom(event) {
+    event.preventDefault();
+    
+    const zoomSpeed = 0.1;
+    const deltaY = event.deltaY;
+    
+    // Zoom camera (move closer/further from scene)
+    if (deltaY > 0) {
+      // Zoom out
+      camera3D.position.multiplyScalar(1 + zoomSpeed);
+    } else {
+      // Zoom in
+      camera3D.position.multiplyScalar(1 - zoomSpeed);
+    }
+    
+    // Limit zoom range
+    const distance = camera3D.position.length();
+    const minDistance = 2;
+    const maxDistance = 20;
+    
+    if (distance < minDistance) {
+      camera3D.position.normalize().multiplyScalar(minDistance);
+    } else if (distance > maxDistance) {
+      camera3D.position.normalize().multiplyScalar(maxDistance);
+    }
+  }
+  
+  // Handle fullscreen change events
+  document.addEventListener('fullscreenchange', () => {
+    if (document.fullscreenElement === cubeContainer) {
+      // Entered fullscreen
+      const rect = cubeContainer.getBoundingClientRect();
+      camera3D.aspect = rect.width / rect.height;
+      camera3D.updateProjectionMatrix();
+      renderer3D.setSize(rect.width, rect.height);
+    } else {
+      // Exited fullscreen
+      onWindow3DResize();
+    }
+  });
+  
   function pcFillColor(i){ return `hsl(${PC_HUE(i)} ${COLOR.sat}% ${COLOR.light}%)`; }
   function slotBgColor(i){ 
     if (IS_BLACK[i]) {

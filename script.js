@@ -676,7 +676,7 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
     
     // If container has no size yet, try again shortly
     if (rect.width === 0 || rect.height === 0) {
-      setTimeout(init3DScene, 50);
+      setTimeout(init3DScene, 100);
       return;
     }
     
@@ -785,6 +785,11 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
 
     // Start render loop
     render3D();
+    
+    // Fix initial sizing with a slight delay to ensure layout has settled
+    setTimeout(() => {
+      onWindow3DResize();
+    }, 150);
   }
 
   function onMouse3DDown(event) {
@@ -882,30 +887,72 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
   }
   
   function toggle3DFullscreen() {
-    if (!document.fullscreenElement) {
-      // Enter fullscreen
+    // Check if already in fullscreen mode (native or custom)
+    if (document.fullscreenElement || cubeContainer.classList.contains('mobile-fullscreen')) {
+      // Exit fullscreen
+      if (document.fullscreenElement) {
+        document.exitFullscreen().then(() => {
+          setTimeout(() => {
+            onWindow3DResize();
+            fullscreen3DBtn.textContent = '⛶ Full';
+          }, 100);
+        });
+      } else {
+        // Exit mobile fullscreen
+        exitMobileFullscreen();
+      }
+      return;
+    }
+    
+    // Try native fullscreen first
+    if (cubeContainer.requestFullscreen) {
       cubeContainer.requestFullscreen().then(() => {
         // Update camera and renderer for fullscreen
         setTimeout(() => {
           const rect = cubeContainer.getBoundingClientRect();
-          const size = Math.min(rect.width, rect.height);
           camera3D.aspect = rect.width / rect.height;
           camera3D.updateProjectionMatrix();
           renderer3D.setSize(rect.width, rect.height);
           fullscreen3DBtn.textContent = '⊞ Exit';
         }, 100);
       }).catch(err => {
-        console.error('Error entering fullscreen:', err);
+        console.log('Native fullscreen failed, using mobile fallback:', err);
+        enterMobileFullscreen();
       });
     } else {
-      // Exit fullscreen
-      document.exitFullscreen().then(() => {
-        setTimeout(() => {
-          onWindow3DResize();
-          fullscreen3DBtn.textContent = '⛶ Full';
-        }, 100);
-      });
+      // Fallback for mobile browsers
+      enterMobileFullscreen();
     }
+  }
+  
+  function enterMobileFullscreen() {
+    // Create mobile-friendly fullscreen overlay
+    cubeContainer.classList.add('mobile-fullscreen');
+    document.body.style.overflow = 'hidden';
+    
+    // Update button
+    fullscreen3DBtn.textContent = '⊞ Exit';
+    
+    // Resize for mobile fullscreen
+    setTimeout(() => {
+      const rect = cubeContainer.getBoundingClientRect();
+      camera3D.aspect = rect.width / rect.height;
+      camera3D.updateProjectionMatrix();
+      renderer3D.setSize(rect.width, rect.height);
+    }, 100);
+  }
+  
+  function exitMobileFullscreen() {
+    cubeContainer.classList.remove('mobile-fullscreen');
+    document.body.style.overflow = '';
+    
+    // Update button
+    fullscreen3DBtn.textContent = '⛶ Full';
+    
+    // Restore normal sizing
+    setTimeout(() => {
+      onWindow3DResize();
+    }, 100);
   }
   
   function handle3DZoom(event) {
@@ -944,8 +991,16 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
       camera3D.updateProjectionMatrix();
       renderer3D.setSize(rect.width, rect.height);
     } else {
-      // Exited fullscreen
+      // Exited fullscreen - update button text
+      fullscreen3DBtn.textContent = '⛶ Full';
       onWindow3DResize();
+    }
+  });
+  
+  // Handle escape key for mobile fullscreen
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && cubeContainer.classList.contains('mobile-fullscreen')) {
+      exitMobileFullscreen();
     }
   });
   
@@ -1516,7 +1571,21 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
   
   // Wait for layout to settle before initializing
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => setTimeout(initializeVisualizations, 50));
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(initializeVisualizations, 50);
+      // Additional resize call after everything has loaded
+      setTimeout(() => {
+        if (typeof onWindow3DResize === 'function') {
+          onWindow3DResize();
+        }
+      }, 300);
+    });
   } else {
     setTimeout(initializeVisualizations, 50);
+    // Additional resize call after everything has loaded
+    setTimeout(() => {
+      if (typeof onWindow3DResize === 'function') {
+        onWindow3DResize();
+      }
+    }, 300);
   }

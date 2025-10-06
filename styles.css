@@ -30,7 +30,7 @@
     border-radius:12px; padding:8px 12px;
   }
   
-  details.settings[open] {
+  .settings-content {
     max-height: 70vh;
     overflow-y: auto;
   }
@@ -51,6 +51,22 @@
   
   .fullscreen-btn:hover {
     background: rgba(0, 0, 0, 0.9);
+  }
+  
+  /* Mobile fullscreen styles */
+  .mobile-fullscreen {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 9999 !important;
+    background: #1a1a1a !important;
+  }
+  
+  .mobile-fullscreen canvas {
+    width: 100vw !important;
+    height: 100vh !important;
   }
   .row{display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin:4px 0}
   .row label{min-width:11ch; opacity:.85}

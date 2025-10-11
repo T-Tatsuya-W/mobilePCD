@@ -392,9 +392,13 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
   // ===== 3D Scene Setup =====
   let scene3D, camera3D, renderer3D, torus3D, torusContainer3D;
   let currentAudioSphere = null; // Track current audio position sphere
+  let audioSphereGeometry = null;
+  let audioSphereMaterial = null;
   let currentRMS = 0; // Track current audio RMS level
   let audioTrailPositions = []; // Array to store previous audio positions
   let audioTrailLine = null; // Three.js line object for trail visualization
+  let audioTrailGeometry = null;
+  let audioTrailMaterial = null;
   let guideLines = { pha5Line: null, pha3Line: null }; // Guide lines for coordinate visualization
   let mouse3D = { x: 0, y: 0 };
   let isMouseDown3D = false;
@@ -1046,44 +1050,53 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
 
   function updateAudioPositionInTorus(dftResult, rms = 0) {
     if (!torusContainer3D) return; // 3D not initialized yet
-    
+
     try {
-      // Remove previous audio sphere if it exists
-      if (currentAudioSphere) {
-        torusContainer3D.remove(currentAudioSphere);
-        currentAudioSphere = null;
-      }
-      
-      // Check if audio is active (same threshold as PCD computation)
+      // Hide visuals when audio is inactive
       if (rms < PCD_MIN_RMS) {
-        clearAudioTrail(); // Clear trail when audio is not active
-        clearGuideLines();  // Clear guide lines when audio is not active
-        return; // Hide sphere when audio is not active
+        if (currentAudioSphere) {
+          currentAudioSphere.visible = false;
+        }
+        clearAudioTrail();
+        clearGuideLines();
+        return;
       }
-      
+
       // Extract coordinates from DFT coefficients
       const pha5 = dftResult.phases[5]; // k=5 phase → pha5 (-π to +π)
       const pha3 = dftResult.phases[3]; // k=3 phase → pha3 (-π to +π)
       const mag3 = dftResult.amplitudes[3]; // k=3 amplitude → mag3 (0 to 1)
-      
-      // Create new audio position sphere
+
+      // Lazily create reusable sphere resources
+      if (!audioSphereGeometry) {
+        audioSphereGeometry = new THREE.SphereGeometry(0.08, 16, 12);
+      }
+      if (!audioSphereMaterial) {
+        audioSphereMaterial = new THREE.MeshLambertMaterial({
+          color: 0xffffff,
+          emissive: 0x000000
+        });
+      }
+      if (!currentAudioSphere) {
+        currentAudioSphere = new THREE.Mesh(audioSphereGeometry, audioSphereMaterial);
+        torusContainer3D.add(currentAudioSphere);
+      }
+      if (currentAudioSphere.parent !== torusContainer3D) {
+        torusContainer3D.add(currentAudioSphere);
+      }
+
+      // Update sphere appearance and position
       const position = toroidalToCartesian(pha5, pha3, mag3);
-      const sphereGeo = new THREE.SphereGeometry(0.08, 16, 12); // Sphere to differentiate from pyramids
-      
-      // Use pha5 for hue like the waypoints, but make it brighter/more saturated
-      const hue = ((pha5 + Math.PI) / (2 * Math.PI)) * 360;
-      const sphereMat = new THREE.MeshLambertMaterial({ 
-        color: new THREE.Color(`hsl(${hue}, 90%, 70%)`), // More vibrant than waypoints
-        emissive: new THREE.Color(`hsl(${hue}, 30%, 20%)`) // Slight glow
-      });
-      
-      currentAudioSphere = new THREE.Mesh(sphereGeo, sphereMat);
+      currentAudioSphere.visible = true;
       currentAudioSphere.position.copy(position);
-      torusContainer3D.add(currentAudioSphere);
-      
+
+      const hue = ((pha5 + Math.PI) / (2 * Math.PI)); // Normalized 0..1
+      currentAudioSphere.material.color.setHSL(hue, 0.9, 0.7);
+      currentAudioSphere.material.emissive.setHSL(hue, 0.3, 0.2);
+
       // Add current position to trail and update trail visualization
       addToAudioTrail(position);
-      
+
       // Update guide lines to show coordinate system
       updateGuideLines(pha5, pha3, mag3, position);
     } catch (error) {
@@ -1096,7 +1109,7 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
     audioTrailPositions.push(position.clone());
     
     // Trim trail to maximum length based on settings
-    const maxLength = parseInt(document.getElementById('trailLength').value);
+    const maxLength = parseInt(document.getElementById('trailLength').value, 10);
     if (audioTrailPositions.length > maxLength) {
       audioTrailPositions.shift(); // Remove oldest position
     }
@@ -1107,67 +1120,94 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
   
   function updateAudioTrail() {
     if (!torusContainer3D) return;
-    
+
     try {
-      // Remove existing trail line
-      if (audioTrailLine) {
-        torusContainer3D.remove(audioTrailLine);
-        audioTrailLine = null;
-      }
-      
-      const maxLength = parseInt(document.getElementById('trailLength').value);
-      
-      // If trail length is 0 or we have less than 2 positions, don't draw trail
+      const maxLength = parseInt(document.getElementById('trailLength').value, 10);
+
+      // If trail length is 0 or we have less than 2 positions, hide trail
       if (maxLength === 0 || audioTrailPositions.length < 2) {
+        if (audioTrailLine) {
+          audioTrailLine.visible = false;
+        }
+        if (audioTrailGeometry) {
+          audioTrailGeometry.setDrawRange(0, 0);
+        }
         return;
       }
-      
+
       // Trim trail positions if needed (for when user reduces trail length)
       while (audioTrailPositions.length > maxLength) {
         audioTrailPositions.shift();
       }
-      
-      // Create trail using small tube segments (more reliable than lines)
-      audioTrailLine = new THREE.Group(); // Use group to hold multiple segments
-      
-      for (let i = 0; i < audioTrailPositions.length - 1; i++) {
-        const start = audioTrailPositions[i];
-        const end = audioTrailPositions[i + 1];
-        
-        // Calculate segment direction and length
-        const direction = new THREE.Vector3().subVectors(end, start);
-        const length = direction.length();
-        
-        if (length > 0) {
-          // Create thin cylinder between points
-          const geometry = new THREE.CylinderGeometry(0.005, 0.005, length, 6); // Very thin tube
-          
-          // Fade effect: newer segments are brighter
-          const opacity = 0.3 + (i / audioTrailPositions.length) * 0.6; // 0.3 to 0.9
-          const material = new THREE.MeshBasicMaterial({ 
-            color: 0x00ffff,
-            opacity: opacity,
-            transparent: true,
-            depthTest: false,     // Don't test against depth buffer (render on top)
-            depthWrite: false     // Don't write to depth buffer
-          });
-          
-          const segment = new THREE.Mesh(geometry, material);
-          
-          // Position and orient the cylinder
-          const midpoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-          segment.position.copy(midpoint);
-          
-          // Orient cylinder along the direction vector
-          const up = new THREE.Vector3(0, 1, 0);
-          direction.normalize();
-          segment.lookAt(end);
-          segment.rotateX(Math.PI / 2); // Adjust for cylinder default orientation
-          
-          audioTrailLine.add(segment);
-        }
+
+      const pointCount = audioTrailPositions.length;
+
+      // Lazily create geometry/material once and reuse
+      if (!audioTrailGeometry) {
+        audioTrailGeometry = new THREE.BufferGeometry();
       }
-      torusContainer3D.add(audioTrailLine);
+      if (!audioTrailMaterial) {
+        audioTrailMaterial = new THREE.LineBasicMaterial({
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.9,
+          depthTest: false,
+          depthWrite: false
+        });
+      }
+
+      // Ensure attributes have correct length
+      const requiredArrayLength = maxLength * 3;
+      let positionAttr = audioTrailGeometry.getAttribute('position');
+      if (!positionAttr || positionAttr.array.length !== requiredArrayLength) {
+        positionAttr = new THREE.Float32BufferAttribute(new Float32Array(requiredArrayLength), 3);
+        audioTrailGeometry.setAttribute('position', positionAttr);
+      }
+      let colorAttr = audioTrailGeometry.getAttribute('color');
+      if (!colorAttr || colorAttr.array.length !== requiredArrayLength) {
+        colorAttr = new THREE.Float32BufferAttribute(new Float32Array(requiredArrayLength), 3);
+        audioTrailGeometry.setAttribute('color', colorAttr);
+      }
+
+      const positions = positionAttr.array;
+      const colors = colorAttr.array;
+
+      const color = new THREE.Color();
+      for (let i = 0; i < pointCount; i++) {
+        const p = audioTrailPositions[i];
+        positions[i * 3] = p.x;
+        positions[i * 3 + 1] = p.y;
+        positions[i * 3 + 2] = p.z;
+
+        const t = pointCount > 1 ? i / (pointCount - 1) : 1;
+        color.setHSL(0.5, 1.0, 0.3 + 0.4 * t);
+        const baseIndex = i * 3;
+        colors[baseIndex] = color.r;
+        colors[baseIndex + 1] = color.g;
+        colors[baseIndex + 2] = color.b;
+      }
+
+      // Zero out any unused vertices to avoid rendering artifacts when drawRange < buffer size
+      for (let i = pointCount; i < maxLength; i++) {
+        const baseIndex = i * 3;
+        positions[baseIndex] = positions[baseIndex + 1] = positions[baseIndex + 2] = 0;
+        colors[baseIndex] = colors[baseIndex + 1] = colors[baseIndex + 2] = 0;
+      }
+
+      positionAttr.needsUpdate = true;
+      colorAttr.needsUpdate = true;
+      audioTrailGeometry.setDrawRange(0, pointCount);
+      audioTrailGeometry.computeBoundingSphere();
+
+      if (!audioTrailLine) {
+        audioTrailLine = new THREE.Line(audioTrailGeometry, audioTrailMaterial);
+        torusContainer3D.add(audioTrailLine);
+      }
+      if (audioTrailLine.parent !== torusContainer3D) {
+        torusContainer3D.add(audioTrailLine);
+      }
+
+      audioTrailLine.visible = true;
     } catch (error) {
       console.error('Error updating audio trail:', error);
     }
@@ -1178,6 +1218,14 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
     if (audioTrailLine) {
       torusContainer3D.remove(audioTrailLine);
       audioTrailLine = null;
+    }
+    if (audioTrailGeometry) {
+      audioTrailGeometry.dispose();
+      audioTrailGeometry = null;
+    }
+    if (audioTrailMaterial) {
+      audioTrailMaterial.dispose();
+      audioTrailMaterial = null;
     }
   }
   
@@ -1231,10 +1279,22 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
   function clearGuideLines() {
     if (guideLines.pha5Line) {
       torusContainer3D.remove(guideLines.pha5Line);
+      if (guideLines.pha5Line.geometry) {
+        guideLines.pha5Line.geometry.dispose();
+      }
+      if (guideLines.pha5Line.material) {
+        guideLines.pha5Line.material.dispose();
+      }
       guideLines.pha5Line = null;
     }
     if (guideLines.pha3Line) {
       torusContainer3D.remove(guideLines.pha3Line);
+      if (guideLines.pha3Line.geometry) {
+        guideLines.pha3Line.geometry.dispose();
+      }
+      if (guideLines.pha3Line.material) {
+        guideLines.pha3Line.material.dispose();
+      }
       guideLines.pha3Line = null;
     }
   }
@@ -1514,6 +1574,11 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
     try { workletNode?.disconnect(); } catch {}
     try { audioContext?.close(); } catch {}
     try { micStream?.getTracks().forEach(t=>t.stop()); } catch {}
+    if (currentAudioSphere) {
+      currentAudioSphere.visible = false;
+    }
+    clearAudioTrail();
+    clearGuideLines();
   }
 
   startBtn.addEventListener('click', start, { passive: true });

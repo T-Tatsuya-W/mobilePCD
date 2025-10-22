@@ -1,20 +1,22 @@
 
 import { pcdToFrequencyDomain } from './pcd-dft.js';
+import { AudioProcessor, DEFAULT_AUDIO_CONFIG, DEFAULT_TUNER_CONFIG } from './audio/processor.js';
   
   // =========================
   // ====== CONFIG HERE ======
   // =========================
-  let WINDOW_SIZE = 8192*2;   // larger window helps tuning stability
-  let HOP_SIZE    = 1024;
-  let MIN_HZ      = 50;
-  let MAX_HZ      = 5000;
-  let REF_A4      = 440;
-  let SMOOTHING   = 0.6;
+  const audioDefaults = { ...DEFAULT_AUDIO_CONFIG };
+  let WINDOW_SIZE = audioDefaults.windowSize;
+  let HOP_SIZE    = audioDefaults.hopSize;
+  let MIN_HZ      = audioDefaults.minHz;
+  let MAX_HZ      = audioDefaults.maxHz;
+  let REF_A4      = audioDefaults.refA4;
+  let SMOOTHING   = audioDefaults.smoothing;
   
   // PCD filtering parameters
-  let PCD_MIN_RMS = 0.001;      // minimum RMS for PCD calculation
-  let PCD_THRESHOLD = 0.005;    // minimum magnitude to include in PCD
-  let PCD_NORMALIZE = 1.0;      // power scaling for PCD normalization
+  let PCD_MIN_RMS = audioDefaults.pcdMinRms;      // minimum RMS for PCD calculation
+  let PCD_THRESHOLD = audioDefaults.pcdThreshold;    // minimum magnitude to include in PCD
+  let PCD_NORMALIZE = audioDefaults.pcdNormalize;      // power scaling for PCD normalization
 
   const RING = {
     innerRadiusRatio: 0.38,
@@ -39,196 +41,15 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
 
   // Tuning needle defaults (some are user-adjustable below)
   const TUNER = {
-    enabled: true,
-    minHz: 70,
-    maxHz: 1800,
-    minProminence: 6.0,  // dB (slider)
-    minRMS: 0.003,       // (slider)
-    reactivity: 0.35,    // 0.05..1.0 (slider) — EMA step for angle smoothing
+    ...DEFAULT_TUNER_CONFIG,
     needleColor: '#00aaff',
     needleWidth: 3,
     hubRadiusRatio: 0.05,
     tipRadiusRatio: 0.98,
     tailRadiusRatio: 0.20
   };
+  let audioProcessor;
   // =========================
-
-  // ===== Utilities =====
-  // Cache window functions to avoid recomputation
-  const windowCache = new Map();
-  const hann = (N) => {
-    if (windowCache.has(N)) return windowCache.get(N);
-    const w = new Float32Array(N);
-    const t = 2 * Math.PI / (N - 1);
-    for (let n = 0; n < N; n++) w[n] = 0.5 * (1 - Math.cos(t * n));
-    windowCache.set(N, w);
-    return w;
-  };
-
-  // Pre-allocated buffers for FFT (reused to avoid GC pressure)
-  let fftBufferRe, fftBufferIm, fftMags, bitRevTable;
-  let currentFFTSize = 0;
-
-  function initFFTBuffers(N){
-    if (N === currentFFTSize) return; // Already initialized
-    currentFFTSize = N;
-    fftBufferRe = new Float32Array(N);
-    fftBufferIm = new Float32Array(N);
-    fftMags = new Float32Array(N/2);
-    
-    // Pre-compute bit-reversal table
-    bitRevTable = new Uint32Array(N);
-    let j = 0;
-    for (let i = 1; i < N; i++) {
-      let bit = N >> 1;
-      for (; j & bit; bit >>= 1) j ^= bit;
-      j ^= bit;
-      bitRevTable[i] = j;
-    }
-  }
-
-  function fftReal(signal){
-    let N = 1; while (N < signal.length) N <<= 1;
-    initFFTBuffers(N);
-    
-    // Clear and copy input
-    fftBufferRe.fill(0);
-    fftBufferIm.fill(0);
-    fftBufferRe.set(signal);
-    
-    // Bit-reversal using pre-computed table
-    for (let i = 1; i < N; i++) {
-      const j = bitRevTable[i];
-      if (i < j) {
-        [fftBufferRe[i], fftBufferRe[j]] = [fftBufferRe[j], fftBufferRe[i]];
-        [fftBufferIm[i], fftBufferIm[j]] = [fftBufferIm[j], fftBufferIm[i]];
-      }
-    }
-    
-    // FFT computation with pre-computed twiddle factors
-    for (let len = 2; len <= N; len <<= 1) {
-      const ang = -2 * Math.PI / len;
-      const wlenRe = Math.cos(ang), wlenIm = Math.sin(ang);
-      for (let i = 0; i < N; i += len) {
-        let wRe = 1, wIm = 0;
-        const halfLen = len >> 1;
-        for (let k = 0; k < halfLen; k++) {
-          const uRe = fftBufferRe[i + k], uIm = fftBufferIm[i + k];
-          const vRe = fftBufferRe[i + k + halfLen] * wRe - fftBufferIm[i + k + halfLen] * wIm;
-          const vIm = fftBufferRe[i + k + halfLen] * wIm + fftBufferIm[i + k + halfLen] * wRe;
-          fftBufferRe[i + k] = uRe + vRe;
-          fftBufferIm[i + k] = uIm + vIm;
-          fftBufferRe[i + k + halfLen] = uRe - vRe;
-          fftBufferIm[i + k + halfLen] = uIm - vIm;
-          const nwRe = wRe * wlenRe - wIm * wlenIm;
-          const nwIm = wRe * wlenIm + wIm * wlenRe;
-          wRe = nwRe; wIm = nwIm;
-        }
-      }
-    }
-    
-    // Compute magnitudes (reuse buffer)
-    const halfN = N >> 1;
-    for (let i = 0; i < halfN; i++) {
-      fftMags[i] = Math.sqrt(fftBufferRe[i] * fftBufferRe[i] + fftBufferIm[i] * fftBufferIm[i]);
-    }
-    return fftMags.subarray(0, halfN);
-  }
-
-  // Pre-computed lookup tables for PCD calculation
-  let pcdLookupTable = null;
-  let currentSampleRate = 0, currentA4 = 0, currentMagsLength = 0;
-
-  function initPCDLookup(magsLength, sampleRate, a4) {
-    if (sampleRate === currentSampleRate && a4 === currentA4 && magsLength === currentMagsLength) return;
-    currentSampleRate = sampleRate;
-    currentA4 = a4;
-    currentMagsLength = magsLength;
-    
-    pcdLookupTable = new Uint8Array(magsLength); // pitch class for each bin
-    const binHz = sampleRate / (magsLength * 2);
-    const log2A4 = Math.log2(a4);
-    
-    for (let k = 0; k < magsLength; k++) {
-      const f = k * binHz;
-      if (f > 0) {
-        const midi = 69 + 12 * (Math.log2(f) - log2A4);
-        pcdLookupTable[k] = ((Math.round(midi) % 12) + 12) % 12;
-      }
-    }
-  }
-
-  function spectrumToPCD(mags, sampleRate, a4=440, minHz=50, maxHz=5000){
-    initPCDLookup(mags.length, sampleRate, a4);
-    
-    const pcd = new Float32Array(12);
-    const binHz = sampleRate / (mags.length * 2);
-    const minBin = Math.max(1, Math.floor(minHz / binHz));
-    const maxBin = Math.min(mags.length - 1, Math.floor(maxHz / binHz));
-    
-    // Vectorized accumulation with threshold filtering
-    for (let k = minBin; k <= maxBin; k++) {
-      const mag = mags[k];
-      if (mag > PCD_THRESHOLD) { // apply magnitude threshold
-        const pc = pcdLookupTable[k];
-        pcd[pc] += mag * mag; // power weighting
-      }
-    }
-    
-    // Apply power normalization and normalize
-    let sum = 0;
-    for (let i = 0; i < 12; i++) {
-      if (PCD_NORMALIZE !== 1.0) {
-        pcd[i] = Math.pow(pcd[i], PCD_NORMALIZE);
-      }
-      sum += pcd[i];
-    }
-    if (sum > 0) {
-      const invSum = 1 / sum;
-      for (let i = 0; i < 12; i++) pcd[i] *= invSum;
-    }
-    return pcd;
-  }
-
-  // Optimized peak detection with early termination
-  function estimatePrimary(mags, sampleRate, minHz, maxHz){
-    const N2 = mags.length;
-    const binHz = sampleRate / (N2 * 2);
-    const kMin = Math.max(2, Math.floor(minHz / binHz));
-    const kMax = Math.min(N2 - 3, Math.floor(maxHz / binHz));
-
-    // Find max bin with early termination for very weak signals
-    let k = kMin, maxVal = 0;
-    const threshold = 1e-6; // Skip very weak signals early
-    
-    for (let i = kMin; i <= kMax; i++) {
-      const v = mags[i];
-      if (v > maxVal) { maxVal = v; k = i; }
-    }
-    if (maxVal < threshold) return null;
-
-    // Reduced neighborhood for prominence (faster)
-    const w = 10; // reduced from 20
-    const from = Math.max(kMin, k - w);
-    const to = Math.min(kMax, k + w);
-    
-    // Fast median approximation using 3-point estimate
-    let sum = 0, count = 0;
-    for (let i = from; i <= to; i += 2) { // sample every other bin
-      if (i !== k) { sum += mags[i]; count++; }
-    }
-    const avgNeighbor = count > 0 ? sum / count : 0;
-    const prominenceDb = avgNeighbor > 0 ? 20 * Math.log10((maxVal + 1e-12) / (avgNeighbor + 1e-12)) : 0;
-
-    // Parabolic interpolation (unchanged - already efficient)
-    const a = mags[k - 1], b = mags[k], c = mags[k + 1];
-    const denom = (a - 2 * b + c) || 1e-12;
-    const delta = 0.5 * (a - c) / denom;
-    const kRef = k + Math.max(-1, Math.min(1, delta));
-    const freq = kRef * binHz;
-
-    return { freq, kRef, prominenceDb };
-  }
 
   // ===== DOM / Canvas =====
   const startBtn = document.getElementById('start');
@@ -295,62 +116,93 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
 
   reactRange.addEventListener('input', () => {
     TUNER.reactivity = parseFloat(reactRange.value);
+    audioProcessor.updateTuner({ reactivity: TUNER.reactivity });
     reactVal.textContent = TUNER.reactivity.toFixed(2);
   });
   promRange.addEventListener('input', () => {
     TUNER.minProminence = parseFloat(promRange.value);
+    audioProcessor.updateTuner({ minProminence: TUNER.minProminence });
     promVal.textContent = TUNER.minProminence.toFixed(1) + ' dB';
   });
   rmsRange.addEventListener('input', () => {
     TUNER.minRMS = parseFloat(rmsRange.value);
+    audioProcessor.updateTuner({ minRMS: TUNER.minRMS });
     rmsVal.textContent = TUNER.minRMS.toFixed(4);
   });
   refA4Input.addEventListener('input', () => {
     const value = parseFloat(refA4Input.value);
     if (value >= 400 && value <= 480) { // validate range
       REF_A4 = value;
+      audioProcessor.updateConfig({ refA4: REF_A4 });
+      REF_A4 = audioProcessor.config.refA4;
     }
   });
   windowRange.addEventListener('input', () => {
     const exp = parseInt(windowRange.value);
     WINDOW_SIZE = Math.pow(2, exp);
+    audioProcessor.updateConfig({ windowSize: WINDOW_SIZE });
+    WINDOW_SIZE = audioProcessor.config.windowSize;
     windowVal.textContent = WINDOW_SIZE.toString();
   });
   hopRange.addEventListener('input', () => {
     const exp = parseInt(hopRange.value);
     HOP_SIZE = Math.pow(2, exp);
+    audioProcessor.updateConfig({ hopSize: HOP_SIZE });
+    HOP_SIZE = audioProcessor.config.hopSize;
     hopVal.textContent = HOP_SIZE.toString();
   });
   smoothRange.addEventListener('input', () => {
     SMOOTHING = parseFloat(smoothRange.value);
+    audioProcessor.updateConfig({ smoothing: SMOOTHING });
+    SMOOTHING = audioProcessor.config.smoothing;
     smoothVal.textContent = SMOOTHING.toFixed(2);
   });
   minHzRange.addEventListener('input', () => {
     MIN_HZ = parseFloat(minHzRange.value);
+    audioProcessor.updateConfig({ minHz: MIN_HZ });
+    MIN_HZ = audioProcessor.config.minHz;
+    MAX_HZ = audioProcessor.config.maxHz;
+    maxHzRange.value = MAX_HZ.toString();
+    maxHzVal.textContent = MAX_HZ.toFixed(0) + ' Hz';
     minHzVal.textContent = MIN_HZ.toFixed(0) + ' Hz';
   });
   maxHzRange.addEventListener('input', () => {
     MAX_HZ = parseFloat(maxHzRange.value);
+    audioProcessor.updateConfig({ maxHz: MAX_HZ });
+    MAX_HZ = audioProcessor.config.maxHz;
+    MIN_HZ = audioProcessor.config.minHz;
+    minHzRange.value = MIN_HZ.toString();
+    minHzVal.textContent = MIN_HZ.toFixed(0) + ' Hz';
     maxHzVal.textContent = MAX_HZ.toFixed(0) + ' Hz';
   });
   tunerMinRange.addEventListener('input', () => {
     TUNER.minHz = parseFloat(tunerMinRange.value);
+    audioProcessor.updateTuner({ minHz: TUNER.minHz });
+    TUNER.minHz = audioProcessor.tunerConfig.minHz;
     tunerMinVal.textContent = TUNER.minHz.toFixed(0) + ' Hz';
   });
   tunerMaxRange.addEventListener('input', () => {
     TUNER.maxHz = parseFloat(tunerMaxRange.value);
+    audioProcessor.updateTuner({ maxHz: TUNER.maxHz });
+    TUNER.maxHz = audioProcessor.tunerConfig.maxHz;
     tunerMaxVal.textContent = TUNER.maxHz.toFixed(0) + ' Hz';
   });
   pcdRmsRange.addEventListener('input', () => {
     PCD_MIN_RMS = parseFloat(pcdRmsRange.value);
+    audioProcessor.updateConfig({ pcdMinRms: PCD_MIN_RMS });
+    PCD_MIN_RMS = audioProcessor.config.pcdMinRms;
     pcdRmsVal.textContent = PCD_MIN_RMS.toFixed(4);
   });
   pcdThreshRange.addEventListener('input', () => {
     PCD_THRESHOLD = parseFloat(pcdThreshRange.value);
+    audioProcessor.updateConfig({ pcdThreshold: PCD_THRESHOLD });
+    PCD_THRESHOLD = audioProcessor.config.pcdThreshold;
     pcdThreshVal.textContent = PCD_THRESHOLD.toFixed(3);
   });
   pcdNormRange.addEventListener('input', () => {
     PCD_NORMALIZE = parseFloat(pcdNormRange.value);
+    audioProcessor.updateConfig({ pcdNormalize: PCD_NORMALIZE });
+    PCD_NORMALIZE = audioProcessor.config.pcdNormalize;
     pcdNormVal.textContent = PCD_NORMALIZE.toFixed(1);
   });
 
@@ -1353,167 +1205,158 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
   resetRot.addEventListener('click', ()=>{ userRotation=0; drawRing(window.currentPCD); });
 
   // ===== Public hook =====
-  window.currentPCD = new Float32Array(12);
   window.drawPending = false; // for throttled drawing
 
   // ===== Audio + analysis =====
-  let audioContext, workletNode, micStream, running=false, sampleRate=48000;
-  const workletURL = URL.createObjectURL(new Blob([`
-    class Tap extends AudioWorkletProcessor {
-      process(inputs){ const ch = inputs[0][0]; if (ch) this.port.postMessage(ch.slice(0)); return true; }
-    }
-    registerProcessor('tap', Tap);
-  `], {type:'text/javascript'}));
+  audioProcessor = new AudioProcessor({
+    windowSize: WINDOW_SIZE,
+    hopSize: HOP_SIZE,
+    minHz: MIN_HZ,
+    maxHz: MAX_HZ,
+    smoothing: SMOOTHING,
+    pcdMinRms: PCD_MIN_RMS,
+    pcdThreshold: PCD_THRESHOLD,
+    pcdNormalize: PCD_NORMALIZE,
+    refA4: REF_A4,
+    tuner: TUNER,
+  });
 
-  function frameRms(buf){
-    let s=0; for (let i=0;i<buf.length;i++) s += buf[i]*buf[i];
-    return Math.sqrt(s / buf.length);
-  }
+  window.currentPCD = audioProcessor.getCurrentPcd();
+
+  let isAudioRunning = false;
+  let startInProgress = false;
+
+  audioProcessor.addEventListener('statechange', ({ detail }) => {
+    isAudioRunning = detail.running;
+    startBtn.disabled = detail.running || startInProgress;
+    stopBtn.disabled = !detail.running;
+    if (detail.running) {
+      statusEl.textContent = 'Running…';
+    } else if (!startInProgress) {
+      statusEl.textContent = 'Stopped';
+    }
+  });
+
+  audioProcessor.addEventListener('analysis', ({ detail }) => {
+    const { pcd, rms, primary } = detail;
+    currentRMS = rms;
+
+    statusEl.textContent = `Running @ ${audioProcessor.getSampleRate().toFixed(0)} Hz | N=${audioProcessor.config.windowSize} hop=${audioProcessor.config.hopSize}`;
+
+    if (primary) {
+      const slice = (Math.PI * 2) / 12;
+      const pc = primary.pitchClass;
+      const a0 = RING.baseRotation + userRotation + pc * slice + RING.gapRadians / 2;
+      const a1 = a0 + slice - RING.gapRadians;
+      const mid = (a0 + a1) / 2;
+      const angleRaw = mid + (primary.cents / 100) * slice;
+
+      if (needleAngleSm == null) needleAngleSm = angleRaw;
+      if (centsSm == null) centsSm = primary.cents;
+
+      const step = Math.max(0.05, Math.min(1.0, TUNER.reactivity));
+      const dAng = wrapDiff(angleRaw, needleAngleSm);
+      needleAngleSm = needleAngleSm + step * dAng;
+      centsSm = centsSm + step * (primary.cents - centsSm);
+
+      lastPrimary = {
+        freq: primary.freq,
+        prominenceDb: primary.prominenceDb,
+        pc,
+        cents: primary.cents,
+        centsSm,
+      };
+    } else {
+      lastPrimary = null;
+      needleAngleSm = null;
+      centsSm = null;
+    }
+
+    if (!window.drawPending) {
+      window.drawPending = true;
+      requestAnimationFrame(() => {
+        pcdText.textContent = '[' + Array.from(pcd).map(v => v.toFixed(3)).join(', ') + ']';
+        updateDFTDisplay(window.currentPCD, currentRMS);
+        drawRing(window.currentPCD);
+        window.drawPending = false;
+      });
+    }
+
+    if (lastPrimary) {
+      const name = currentNoteLabels[lastPrimary.pc];
+      const centsStr = (lastPrimary.centsSm >= 0 ? '+' : '') + lastPrimary.centsSm.toFixed(1);
+      tuneEl.textContent = `Primary: ${name}  ${centsStr}¢  (~${lastPrimary.freq.toFixed(1)} Hz, ${lastPrimary.prominenceDb.toFixed(1)} dB)`;
+    } else {
+      tuneEl.textContent = '';
+    }
+
+    window.dispatchEvent(new CustomEvent('pcd', { detail: window.currentPCD }));
+  });
+
+  audioProcessor.addEventListener('error', ({ detail }) => {
+    const message = detail?.message || String(detail);
+    console.error('Audio processor error:', detail);
+    statusEl.textContent = `Error: ${message}`;
+    startInProgress = false;
+    isAudioRunning = false;
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+  });
 
   async function start(){
-    if (running) return;
-    running = true; startBtn.disabled = true; stopBtn.disabled = false; statusEl.textContent = 'Starting…';
-
-    audioContext = new (window.AudioContext || window.webkitAudioContext)({latencyHint:'interactive'});
-    sampleRate = audioContext.sampleRate;
-    await audioContext.audioWorklet.addModule(workletURL);
-
-    micStream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false },
-      video: false
-    });
-
-    const src = audioContext.createMediaStreamSource(micStream);
-    const silent = audioContext.createGain(); silent.gain.value = 0;
-    workletNode = new AudioWorkletNode(audioContext, 'tap');
-    src.connect(workletNode).connect(silent).connect(audioContext.destination);
-
-    let ringBuf = new Float32Array(WINDOW_SIZE);
-    let windowFn = hann(WINDOW_SIZE);
-    let analysisBuf = new Float32Array(WINDOW_SIZE); // pre-allocate
-    let writeIdx = 0, filled = 0, hopCount = 0;
-
-    workletNode.port.onmessage = (ev) => {
-      const frame = ev.data; // Float32Array(128)
-      for (let i=0;i<frame.length;i++){
-        ringBuf[writeIdx++] = frame[i];
-        if (writeIdx >= WINDOW_SIZE) writeIdx = 0;
-        if (filled < WINDOW_SIZE) filled++;
-        hopCount++;
-        if (hopCount >= HOP_SIZE && filled >= WINDOW_SIZE){
-          hopCount = 0;
-          analyze();
-        }
+    if (isAudioRunning || startInProgress) return;
+    startInProgress = true;
+    startBtn.disabled = true;
+    stopBtn.disabled = true;
+    statusEl.textContent = 'Starting…';
+    try {
+      await audioProcessor.start();
+    } catch (error) {
+      const message = error?.message || String(error);
+      console.error('Failed to start audio:', error);
+      statusEl.textContent = `Error: ${message}`;
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      startInProgress = false;
+      isAudioRunning = false;
+    } finally {
+      if (!isAudioRunning) {
+        startBtn.disabled = false;
       }
-    };
+      startInProgress = false;
+    }
+  }
 
-    function analyze(){
-      // Check if we need to reallocate buffers (window size changed)
-      if (ringBuf.length !== WINDOW_SIZE) {
-        ringBuf = new Float32Array(WINDOW_SIZE);
-        windowFn = hann(WINDOW_SIZE);
-        analysisBuf = new Float32Array(WINDOW_SIZE);
-        writeIdx = 0; filled = 0; // reset
-        return; // skip this frame
-      }
-      
-      // rebuild contiguous window (reuse buffer)
-      const start = writeIdx % WINDOW_SIZE;
-      const first = ringBuf.subarray(start);
-      analysisBuf.set(first, 0);
-      analysisBuf.set(ringBuf.subarray(0, start), first.length);
-
-      // windowing (in-place)
-      for (let i = 0; i < WINDOW_SIZE; i++) analysisBuf[i] *= windowFn[i];
-
-      // For gating + tuner
-      const rms = frameRms(analysisBuf);
-      currentRMS = rms; // Store for UI callbacks
-
-      // FFT
-      const mags = fftReal(analysisBuf);
-
-      // PCD (only if above RMS threshold)
-      let pcd;
-      if (rms >= PCD_MIN_RMS) {
-        pcd = spectrumToPCD(mags, sampleRate, REF_A4, MIN_HZ, MAX_HZ);
-      } else {
-        pcd = new Float32Array(12); // silent frame = zero PCD
-      }
-
-      // Smooth PCD
-      for (let i=0;i<12;i++){
-        window.currentPCD[i] = SMOOTHING*window.currentPCD[i] + (1-SMOOTHING)*pcd[i];
-      }
-
-      // --- Tuning needle estimation (with smoothing controls) ---
+  async function stop(){
+    if (!isAudioRunning && !startInProgress) return;
+    stopBtn.disabled = true;
+    statusEl.textContent = 'Stopping…';
+    try {
+      await audioProcessor.stop();
+    } finally {
+      startInProgress = false;
+      isAudioRunning = false;
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      tuneEl.textContent = '';
+      needleAngleSm = null;
+      centsSm = null;
       lastPrimary = null;
-      if (TUNER.enabled && rms >= TUNER.minRMS){
-        const est = estimatePrimary(mags, sampleRate, TUNER.minHz, TUNER.maxHz);
-        if (est && est.prominenceDb >= TUNER.minProminence){
-          const midiReal = 69 + 12*Math.log2(est.freq / REF_A4);
-          const nearest  = Math.round(midiReal);
-          const cents    = (midiReal - nearest) * 100; // positive = sharp
-          const pc       = ((nearest % 12) + 12) % 12;
-
-          const slice = (Math.PI*2)/12;
-          const a0 = RING.baseRotation + userRotation + pc*slice + RING.gapRadians/2;
-          const a1 = a0 + slice - RING.gapRadians;
-          const mid = (a0+a1)/2;
-          const angleRaw = mid + (cents/100) * slice;
-
-          // initialize smoothed state if null
-          if (needleAngleSm == null){ needleAngleSm = angleRaw; }
-          if (centsSm == null){ centsSm = cents; }
-
-          // EMA smoothing with angle unwrapping
-          const step = Math.max(0.05, Math.min(1.0, TUNER.reactivity)); // clamp
-          const dAng = wrapDiff(angleRaw, needleAngleSm);
-          needleAngleSm = needleAngleSm + step * dAng;
-          centsSm = centsSm + step * (cents - centsSm);
-
-          lastPrimary = { cents, centsSm, pc, freq: est.freq, confDb: est.prominenceDb };
-        }
-      }
-
-      // Throttled UI updates (reduce draw calls)
+      window.currentPCD.fill(0);
+      currentRMS = 0;
       if (!window.drawPending) {
         window.drawPending = true;
         requestAnimationFrame(() => {
-          pcdText.textContent = '[' + Array.from(window.currentPCD).map(v=>v.toFixed(3)).join(', ') + ']';
+          pcdText.textContent = '[' + Array.from(window.currentPCD).map(v => v.toFixed(3)).join(', ') + ']';
           updateDFTDisplay(window.currentPCD, currentRMS);
           drawRing(window.currentPCD);
           window.drawPending = false;
         });
       }
-
-      if (lastPrimary){
-        const name = currentNoteLabels[lastPrimary.pc];
-        const centsStr = (lastPrimary.centsSm>=0?'+':'') + lastPrimary.centsSm.toFixed(1);
-        tuneEl.textContent = `Primary: ${name}  ${centsStr}¢  (~${lastPrimary.freq.toFixed(1)} Hz, ${lastPrimary.confDb.toFixed(1)} dB)`;
-      } else {
-        // Hide needle when no active pitch detected
-        needleAngleSm = null;
-        centsSm = null;
-        tuneEl.textContent = '';
-      }
-
-      // Event for external consumers
-      window.dispatchEvent(new CustomEvent('pcd', {detail: window.currentPCD}));
-
-      statusEl.textContent = `Running @ ${sampleRate} Hz | N=${WINDOW_SIZE} hop=${HOP_SIZE}`;
+      clearAudioTrail();
+      clearGuideLines();
+      statusEl.textContent = 'Stopped';
     }
-
-    setupCanvas();
-    drawRing(window.currentPCD);
-  }
-
-  function stop(){
-    if (!running) return;
-    running = false; startBtn.disabled = false; stopBtn.disabled = true; statusEl.textContent = 'Stopped';
-    try { workletNode?.disconnect(); } catch {}
-    try { audioContext?.close(); } catch {}
-    try { micStream?.getTracks().forEach(t=>t.stop()); } catch {}
   }
 
   startBtn.addEventListener('click', start, { passive: true });
@@ -1521,7 +1364,7 @@ import { pcdToFrequencyDomain } from './pcd-dft.js';
 
   // Initial setup
   setupCanvas();
-  drawRing(new Float32Array(12)); // Draw empty ring immediately
+  drawRing(window.currentPCD); // Draw empty ring immediately
   
   // Handle window resize
   window.addEventListener('resize', () => {

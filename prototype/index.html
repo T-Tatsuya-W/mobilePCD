@@ -13,17 +13,6 @@
 </head>
 <body>
   <main class="app-shell">
-    <header class="topbar">
-      <div>
-        <h1>mobilePCD interaction prototype</h1>
-        <p>Two-thumb control + Web Audio + Three.js test page</p>
-      </div>
-      <div class="status-group">
-        <span id="audioStatus" class="pill">audio idle</span>
-        <button id="audioToggle" type="button">Enable audio</button>
-      </div>
-    </header>
-
     <section class="workspace" aria-label="Interactive prototype">
       <section id="dialZone" class="control-panel dial-panel" aria-label="Infinite relative control">
         <div class="panel-title">θ</div>
@@ -47,7 +36,10 @@
       </section>
 
       <section class="control-panel radar-panel">
-        <div class="panel-title">Radar / XY pad</div>
+        <div class="radar-header">
+          <div><strong>mobilePCD</strong><div id="audioStatus" class="audio-status">audio idle</div></div>
+          <button id="audioToggle" type="button">Enable audio</button>
+        </div>
         <div id="radarPad" class="radar-pad" aria-label="Circular XY pad">
           <div class="axis axis-x"></div>
           <div class="axis axis-y"></div>
@@ -62,10 +54,6 @@
       </section>
     </section>
 
-    <footer class="footer">
-      <span>Prototype only — existing app is untouched.</span>
-      <span>Page visibility stops active audio automatically.</span>
-    </footer>
   </main>
 
   <script type="module" src="./app.js"></script>

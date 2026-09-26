@@ -9,7 +9,8 @@
 
 html, body {
   margin: 0;
-  min-height: 100%;
+  height: 100%;
+  overflow: hidden;
   background:
     radial-gradient(circle at top, rgba(92, 118, 255, 0.13), transparent 32rem),
     #111318;
@@ -17,7 +18,8 @@ html, body {
 }
 
 body {
-  min-height: 100svh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 button {
@@ -33,11 +35,13 @@ button {
 button:active { transform: translateY(1px); }
 
 .app-shell {
-  min-height: 100svh;
+  height: 100dvh;
+  overflow: hidden;
+  min-height: 0;
   padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
     max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 12px;
 }
 
@@ -77,7 +81,7 @@ button:active { transform: translateY(1px); }
 .workspace {
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(84px, 1fr) minmax(0, min(52vw, 70svh)) minmax(150px, 1.4fr);
+  grid-template-columns: clamp(52px, 9vw, 90px) minmax(0, min(48vw, 74dvh)) minmax(0, 1fr);
   align-items: stretch;
   gap: 10px;
 }
@@ -115,7 +119,9 @@ button:active { transform: translateY(1px); }
 
 .dial-track {
   flex: 1;
-  min-height: 180px;
+  min-height: 0;
+  position: relative;
+  margin: 8px 0;
   border-radius: 14px;
   border: 1px dashed #3c4a5d;
   display: grid;
@@ -123,11 +129,35 @@ button:active { transform: translateY(1px); }
   background: linear-gradient(180deg, rgba(98, 127, 255, 0.08), rgba(98, 127, 255, 0.01));
 }
 
-.dial-arrows {
+.theta-tick {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 1px;
+  background: #5a6b86;
+}
+.theta-tick span {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  color: #aab9d3;
+  font-size: 0.64rem;
+  line-height: 1;
+}
+.theta-marker {
+  position: absolute;
+  left: 0;
+  width: 45%;
+  height: 3px;
+  background: #9affc9;
+  transform: translateY(-50%);
+  box-shadow: 0 0 8px #9affc9;
+  pointer-events: none;
+}
+.theta-value {
   text-align: center;
-  line-height: 1.55;
-  color: #8ea6ff;
-  font-size: 1.15rem;
+  font: 0.78rem ui-monospace, monospace;
+  white-space: nowrap;
 }
 
 .readout {
@@ -246,6 +276,7 @@ button:active { transform: translateY(1px); }
 
 .footer {
   font-size: 0.75rem;
+  display: none;
 }
 
 @media (max-width: 720px) {
@@ -257,7 +288,7 @@ button:active { transform: translateY(1px); }
   .topbar p { display: none; }
 
   .workspace {
-    grid-template-columns: minmax(70px, 1fr) minmax(0, min(46vw, 70svh)) minmax(126px, 1.5fr);
+    grid-template-columns: 58px minmax(0, min(46vw, 70dvh)) minmax(0, 1fr);
     gap: 6px;
   }
 
@@ -271,15 +302,30 @@ button:active { transform: translateY(1px); }
 
 @media (orientation: portrait) and (max-width: 560px) {
   .workspace {
-    grid-template-columns: 72px minmax(0, 1fr);
-    grid-template-rows: auto minmax(220px, 1fr);
+    grid-template-columns: 58px minmax(0, 1fr);
+    grid-template-rows: minmax(0, auto) minmax(0, 1fr);
   }
 
   .dial-panel { grid-row: 1 / span 2; }
-  .visual-panel { grid-column: 2; width: 100%; justify-self: center; }
+  .visual-panel { grid-column: 2; width: min(100%, 43dvh); justify-self: center; }
   .radar-panel { grid-column: 2; }
   .radar-pad { width: min(100%, 32svh); }
   .dial-track { min-height: 0; }
   .dial-panel .hint { display: none; }
   .footer { display: none; }
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .app-shell { padding: max(4px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)); gap: 4px; }
+  .topbar h1 { font-size: 0.85rem; }
+  .topbar p, .pill, .hint, .visual-overlay small { display: none; }
+  button { padding: 0.3rem 0.55rem; font-size: 0.75rem; }
+  .workspace { grid-template-columns: 46px minmax(0, 1fr) minmax(0, 1.2fr); gap: 5px; }
+  .visual-panel { width: min(100%, calc(100dvh - 56px)); justify-self: center; }
+  .control-panel { padding: 5px; gap: 3px; }
+  .radar-pad { width: min(100%, calc(100dvh - 120px)); max-height: calc(100dvh - 120px); }
+  .radar-panel .xy-grid { display: none; }
+  .dial-panel .panel-title { font-size: 0.9rem; text-align: center; }
+  .theta-tick span { font-size: 0.55rem; }
+  .theta-value { font-size: 0.62rem; }
 }

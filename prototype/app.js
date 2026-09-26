@@ -30,6 +30,10 @@ let audioEnabled = false;
 function updateDialUi() {
   dialValueEl.textContent = state.dialValue.toFixed(2) + 'π';
   document.getElementById('thetaMarker').style.top = ((1 - state.dialValue) * 50) + '%';
+  // Show the same point at both ends near ±π, like a seam on a circular scale.
+  const ghost = document.getElementById('thetaMarkerGhost');
+  ghost.style.top = state.dialValue >= 0 ? '100%' : '0%';
+  ghost.style.opacity = Math.abs(state.dialValue) > 0.9 ? '0.55' : '0';
 }
 
 function updateRadarUi() {
@@ -69,12 +73,25 @@ dialZone.addEventListener('pointermove', (event) => {
   const acceleration = 1 + t * t * (3 - 2 * t);
   const trackHeight = Math.max(1, dialZone.querySelector('.dial-track').clientHeight);
   const delta = -dy * 2 / trackHeight * acceleration;
+  moveTheta(delta);
+});
+
+function moveTheta(delta) {
   state.dialUnwrapped += delta;
-  // One full revolution spans -π to +π; wrapping keeps the swipe continuous.
+  // One full revolution spans -π to +π, in either direction.
   state.dialValue = ((state.dialUnwrapped + 1) % 2 + 2) % 2 - 1;
   updateDialUi();
   updateSynth();
-});
+}
+
+// Mouse wheel and trackpads can keep turning the same circular scale.
+dialZone.addEventListener('wheel', (event) => {
+  event.preventDefault();
+  const height = Math.max(1, dialZone.querySelector('.dial-track').clientHeight);
+  const pixels = event.deltaMode === 1 ? event.deltaY * 16 :
+    event.deltaMode === 2 ? event.deltaY * height : event.deltaY;
+  moveTheta(-pixels * 2 / height);
+}, { passive: false });
 
 function endDial(event) {
   if (event.pointerId !== state.dialPointerId) return;

@@ -77,7 +77,8 @@ button:active { transform: translateY(1px); }
 .workspace {
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(84px, 0.68fr) minmax(0, 2.25fr) minmax(150px, 1.05fr);
+  grid-template-columns: minmax(84px, 1fr) minmax(0, min(52vw, 70svh)) minmax(150px, 1.4fr);
+  align-items: stretch;
   gap: 10px;
 }
 
@@ -150,12 +151,14 @@ button:active { transform: translateY(1px); }
   font-size: 0.88rem;
 }
 
-.visual-panel { min-height: 320px; }
+.visual-panel { aspect-ratio: 1; min-width: 0; }
 
 .three-container {
-  width: 100%;
-  height: 100%;
-  min-height: 320px;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
 }
 
 .three-container canvas {
@@ -182,7 +185,7 @@ button:active { transform: translateY(1px); }
 }
 
 .radar-pad {
-  width: min(100%, 42vh);
+  width: min(100%, 42svh);
   aspect-ratio: 1;
   align-self: center;
   border-radius: 50%;
@@ -254,7 +257,7 @@ button:active { transform: translateY(1px); }
   .topbar p { display: none; }
 
   .workspace {
-    grid-template-columns: minmax(70px, 0.62fr) minmax(0, 1.55fr) minmax(126px, 1fr);
+    grid-template-columns: minmax(70px, 1fr) minmax(0, min(46vw, 70svh)) minmax(126px, 1.5fr);
     gap: 6px;
   }
 
@@ -264,18 +267,19 @@ button:active { transform: translateY(1px); }
   .readout { padding: 0.35rem 0.4rem; }
   .readout strong { font-size: 0.72rem; }
   .readout span { font-size: 0.65rem; }
-  .visual-panel, .three-container { min-height: 250px; }
 }
 
 @media (orientation: portrait) and (max-width: 560px) {
   .workspace {
-    grid-template-columns: 82px 1fr;
-    grid-template-rows: minmax(300px, 1fr) auto;
+    grid-template-columns: 72px minmax(0, 1fr);
+    grid-template-rows: auto minmax(220px, 1fr);
   }
 
   .dial-panel { grid-row: 1 / span 2; }
-  .visual-panel { grid-column: 2; }
+  .visual-panel { grid-column: 2; width: 100%; justify-self: center; }
   .radar-panel { grid-column: 2; }
-  .radar-pad { width: min(72vw, 250px); }
+  .radar-pad { width: min(100%, 32svh); }
+  .dial-track { min-height: 0; }
+  .dial-panel .hint { display: none; }
   .footer { display: none; }
 }

@@ -176,7 +176,7 @@ body {
 }
 
 .radar-pad {
-  width: min(100%, 48dvh);
+  width: min(100%, var(--radar-fit, 48dvh));
   aspect-ratio: 1;
   align-self: center;
   border-radius: 50%;
@@ -260,7 +260,7 @@ body {
   }
   .dial-panel { grid-column: 1; grid-row: 2; }
   .radar-panel { grid-column: 2; grid-row: 2; }
-  .radar-pad { width: min(100%, calc(45dvh - 80px)); }
+  .radar-pad { width: min(100%, var(--radar-fit, calc(45dvh - 80px))); }
   .control-panel { padding: 8px; gap: 6px; }
   .dial-track { margin: 4px 0; }
   .polar-grid .readout { padding: 0.3rem 0.1rem; }
@@ -277,7 +277,7 @@ body {
     gap: 5px;
   }
   .control-panel { padding: 5px; gap: 3px; }
-  .radar-pad { width: min(100%, calc(100dvh - 70px)); }
+  .radar-pad { width: min(100%, var(--radar-fit, calc(100dvh - 70px))); }
   .polar-grid .readout { padding: 0.2rem 0.1rem; }
   .polar-grid .readout strong { font-size: 0.7rem; }
   .visual-overlay small { display: none; }
@@ -286,3 +286,27 @@ body {
 
 .radar-header { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
 .radar-header strong { font-size: 0.85rem; }
+
+/* A landscape-shaped radar card places the numbers beside the circle. */
+.radar-panel.wide {
+  display: grid;
+  grid-template-columns: minmax(82px, 28%) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  align-items: center;
+}
+.radar-panel.wide .radar-header { grid-column: 1 / -1; grid-row: 1; }
+.radar-panel.wide .polar-grid {
+  grid-column: 1;
+  grid-row: 2;
+  grid-template-columns: minmax(0, 1fr);
+  align-self: stretch;
+  margin-top: 0;
+}
+.radar-panel.wide .radar-pad {
+  grid-column: 2;
+  grid-row: 2;
+  width: min(100%, var(--radar-fit));
+  height: min(100%, var(--radar-fit));
+  align-self: center;
+  justify-self: center;
+}

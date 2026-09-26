@@ -41,8 +41,8 @@ body {
   min-height: 0;
   height: 100%;
   display: grid;
-  grid-template-columns: clamp(52px, 9vw, 90px) minmax(0, min(48vw, 74dvh)) minmax(0, 1fr);
-  align-items: stretch;
+  /* Reserve a slim strip, the largest square that fits, and the rest for radar. */
+  grid-template-columns: 56px minmax(0, min(calc(100dvh - 24px), calc(100vw - 340px))) minmax(0, 1fr);
   gap: 10px;
 }
 
@@ -142,7 +142,7 @@ body {
   font-size: 0.88rem;
 }
 
-.visual-panel { aspect-ratio: 1; min-width: 0; }
+.visual-panel { aspect-ratio: 1; min-width: 0; width: 100%; align-self: start; }
 
 .three-container {
   position: absolute;
@@ -241,54 +241,48 @@ body {
 }
 .polar-grid .readout strong { font-size: clamp(0.62rem, 2vw, 0.88rem); }
 
-@media (max-width: 720px) {
+/* The same gap and panel treatment applies in both arrangements. */
+@media (orientation: portrait), (max-width: 620px) {
   .app-shell {
     padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
       max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
   }
-
-  .workspace {
-    grid-template-columns: 58px minmax(0, min(46vw, 70dvh)) minmax(0, 1fr);
-    gap: 6px;
-  }
-
-  .control-panel { padding: 8px; gap: 6px; }
-  .panel-title { font-size: 0.66rem; }
-  .hint { font-size: 0.66rem; }
-  .readout { padding: 0.35rem 0.4rem; }
-  .readout strong { font-size: 0.72rem; }
-  .readout span { font-size: 0.65rem; }
-}
-
-@media (orientation: portrait) and (max-width: 560px) {
   .workspace {
     grid-template-columns: 58px minmax(0, 1fr);
-    grid-template-rows: minmax(0, auto) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 8px;
   }
-
-  .dial-panel { grid-row: 1 / span 2; }
-  .visual-panel { grid-column: 2; width: min(100%, 47dvh); justify-self: center; }
-  .radar-panel { grid-column: 2; }
-  .radar-pad { width: min(100%, 31dvh); }
-  .dial-track { min-height: 0; }
-  .radar-panel .hint { display: none; }
+  .visual-panel {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    width: min(100%, 55dvh);
+    justify-self: center;
+  }
+  .dial-panel { grid-column: 1; grid-row: 2; }
+  .radar-panel { grid-column: 2; grid-row: 2; }
+  .radar-pad { width: min(100%, calc(45dvh - 80px)); }
+  .control-panel { padding: 8px; gap: 6px; }
+  .dial-track { margin: 4px 0; }
+  .polar-grid .readout { padding: 0.3rem 0.1rem; }
+  .polar-grid .readout strong { font-size: 0.7rem; }
 }
 
-@media (orientation: landscape) and (max-height: 600px) {
-  .app-shell { padding: max(4px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)); gap: 4px; }
-  .hint, .visual-overlay small { display: none; }
-  .workspace { grid-template-columns: 46px minmax(0, 1fr) minmax(0, 1.2fr); gap: 5px; }
-  .visual-panel { width: min(100%, calc(100dvh - 12px)); justify-self: center; }
+@media (orientation: landscape) and (max-height: 600px) and (min-width: 621px) {
+  .app-shell {
+    padding: max(4px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right))
+      max(4px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+  }
+  .workspace {
+    grid-template-columns: 46px minmax(0, min(calc(100dvh - 8px), calc(100vw - 326px))) minmax(0, 1fr);
+    gap: 5px;
+  }
   .control-panel { padding: 5px; gap: 3px; }
-  .radar-pad { width: min(100%, calc(100dvh - 70px)); max-height: calc(100dvh - 70px); }
+  .radar-pad { width: min(100%, calc(100dvh - 70px)); }
   .polar-grid .readout { padding: 0.2rem 0.1rem; }
   .polar-grid .readout strong { font-size: 0.7rem; }
+  .visual-overlay small { display: none; }
   .theta-tick span { font-size: 0.55rem; }
-  .theta-value { font-size: 0.62rem; }
 }
 
 .radar-header { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
 .radar-header strong { font-size: 0.85rem; }
-@media (orientation: landscape) and (max-height: 600px) {
-  .radar-header strong { font-size: 0.73rem; }
-}

@@ -14,8 +14,7 @@
 <body>
   <main class="app-shell">
     <section class="workspace" aria-label="Interactive prototype">
-      <section id="dialZone" class="control-panel dial-panel" aria-label="Infinite relative control">
-        <div class="panel-title">θ</div>
+      <section id="dialZone" class="control-panel dial-panel" aria-label="Theta relative control">
         <div class="dial-track" aria-hidden="true">
           <div class="theta-tick" style="top: 0%"><span>+π</span></div>
           <div class="theta-tick" style="top: 25%"><span>+½π</span></div>
@@ -25,7 +24,6 @@
           <div id="thetaMarker" class="theta-marker"></div>
           <div id="thetaMarkerGhost" class="theta-marker theta-marker-ghost"></div>
         </div>
-        <strong id="dialValue" class="theta-value">0.00π</strong>
       </section>
 
       <section class="visual-panel">
@@ -38,20 +36,18 @@
 
       <section class="control-panel radar-panel">
         <div class="radar-header">
-          <div><strong>mobilePCD</strong><div id="audioStatus" class="audio-status">audio idle</div></div>
-          <button id="audioToggle" type="button">Enable audio</button>
+          <strong>mobilePCD</strong>
         </div>
         <div id="radarPad" class="radar-pad" aria-label="Circular XY pad">
           <div class="axis axis-x"></div>
           <div class="axis axis-y"></div>
           <div id="radarPoint" class="radar-point"></div>
         </div>
-        <div class="xy-grid">
-          <div class="readout"><span>x</span><strong id="xValue">0.000</strong></div>
-          <div class="readout"><span>y</span><strong id="yValue">0.000</strong></div>
-          <div class="readout"><span>held</span><strong id="heldValue">no</strong></div>
+        <div class="polar-grid">
+          <div class="readout"><span>θ</span><strong id="dialValue">0.00π</strong></div>
+          <div class="readout"><span>Φ</span><strong id="phiValue">0.00π</strong></div>
+          <div class="readout"><span>r</span><strong id="radiusValue">0.00</strong></div>
         </div>
-        <p class="hint">X controls pitch; Y controls volume (top loud, bottom silent). Audio sounds only while held.</p>
       </section>
     </section>
 

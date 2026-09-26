@@ -14,18 +14,8 @@ const dialValueEl = document.getElementById('dialValue');
 
 const radarPad = document.getElementById('radarPad');
 const radarPoint = document.getElementById('radarPoint');
-const xValueEl = document.getElementById('xValue');
-const yValueEl = document.getElementById('yValue');
-const heldValueEl = document.getElementById('heldValue');
-
-const audioToggle = document.getElementById('audioToggle');
-const audioStatus = document.getElementById('audioStatus');
-
-let audioContext = null;
-let oscillator = null;
-let gainNode = null;
-let filterNode = null;
-let audioEnabled = false;
+const phiValueEl = document.getElementById('phiValue');
+const radiusValueEl = document.getElementById('radiusValue');
 
 function updateDialUi() {
   dialValueEl.textContent = state.dialValue.toFixed(2) + 'π';
@@ -37,9 +27,10 @@ function updateDialUi() {
 }
 
 function updateRadarUi() {
-  xValueEl.textContent = state.radar.x.toFixed(3);
-  yValueEl.textContent = state.radar.y.toFixed(3);
-  heldValueEl.textContent = state.radar.held ? 'yes' : 'no';
+  const phi = Math.atan2(state.radar.y, state.radar.x) / Math.PI;
+  const radius = Math.min(1, Math.hypot(state.radar.x, state.radar.y));
+  phiValueEl.textContent = phi.toFixed(2) + 'π';
+  radiusValueEl.textContent = radius.toFixed(2);
   radarPoint.classList.toggle('active', state.radar.held);
 
   const px = 50 + state.radar.x * 50;
@@ -47,7 +38,6 @@ function updateRadarUi() {
   radarPoint.style.left = px + '%';
   radarPoint.style.top = py + '%';
 
-  updateSynth();
 }
 
 dialZone.addEventListener('pointerdown', (event) => {
@@ -81,7 +71,6 @@ function moveTheta(delta) {
   // One full revolution spans -π to +π, in either direction.
   state.dialValue = ((state.dialUnwrapped + 1) % 2 + 2) % 2 - 1;
   updateDialUi();
-  updateSynth();
 }
 
 // Mouse wheel and trackpads can keep turning the same circular scale.
@@ -128,13 +117,12 @@ function setRadarFromEvent(event) {
   updateRadarUi();
 }
 
-radarPad.addEventListener('pointerdown', async (event) => {
+radarPad.addEventListener('pointerdown', (event) => {
   if (state.radar.pointerId !== null) return;
   state.radar.pointerId = event.pointerId;
   state.radar.held = true;
   radarPad.setPointerCapture(event.pointerId);
   setRadarFromEvent(event);
-  await ensureAudioReady();
   updateRadarUi();
 });
 
@@ -160,83 +148,11 @@ radarPad.addEventListener('lostpointercapture', (event) => {
   }
 });
 
-async function ensureAudioReady() {
-  if (!audioEnabled) return;
-  if (!audioContext) {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    audioContext = new AudioCtx({ latencyHint: 'interactive' });
-
-    oscillator = audioContext.createOscillator();
-    gainNode = audioContext.createGain();
-    filterNode = audioContext.createBiquadFilter();
-
-    oscillator.type = 'sine';
-    filterNode.type = 'lowpass';
-    filterNode.Q.value = 1.2;
-    gainNode.gain.value = 0;
-
-    oscillator.connect(filterNode).connect(gainNode).connect(audioContext.destination);
-    oscillator.start();
-  }
-
-  if (audioContext.state === 'suspended') {
-    await audioContext.resume();
-  }
-}
-
-function updateSynth() {
-  if (!audioContext || !oscillator || !gainNode || !filterNode) return;
-
-  const now = audioContext.currentTime;
-  const xNorm = (state.radar.x + 1) / 2;
-  const yNorm = (state.radar.y + 1) / 2;
-
-  // 110-880 Hz across the X axis; dial adds a continuous transposition offset.
-  const baseFrequency = 110 * Math.pow(8, xNorm);
-  const transposition = Math.pow(2, state.dialUnwrapped);
-  const frequency = Math.min(2400, Math.max(45, baseFrequency * transposition));
-  const cutoff = 6000;
-
-  oscillator.frequency.cancelScheduledValues(now);
-  oscillator.frequency.setTargetAtTime(frequency, now, 0.015);
-
-  filterNode.frequency.cancelScheduledValues(now);
-  filterNode.frequency.setTargetAtTime(cutoff, now, 0.02);
-
-  const targetGain = state.radar.held && audioEnabled ? 0.13 * yNorm : 0;
-  gainNode.gain.cancelScheduledValues(now);
-  gainNode.gain.setTargetAtTime(targetGain, now, targetGain > 0 ? 0.02 : 0.06);
-}
-
-async function disableAudio() {
-  audioEnabled = false;
-  audioToggle.textContent = 'Enable audio';
-  audioStatus.textContent = 'audio idle';
-  updateSynth();
-
-  if (audioContext && audioContext.state === 'running') {
-    await audioContext.suspend();
-  }
-}
-
-audioToggle.addEventListener('click', async () => {
-  audioEnabled = !audioEnabled;
-  if (audioEnabled) {
-    audioToggle.textContent = 'Disable audio';
-    audioStatus.textContent = 'audio ready';
-    await ensureAudioReady();
-    updateSynth();
-  } else {
-    await disableAudio();
-  }
-});
-
-document.addEventListener('visibilitychange', async () => {
+document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
     state.radar.held = false;
     state.radar.pointerId = null;
     updateRadarUi();
-    await disableAudio();
   }
 });
 
@@ -273,8 +189,7 @@ container.addEventListener('pointermove', (event) => {
   if (event.pointerId !== viewPointerId) return;
   const scale = Math.max(1, container.clientWidth);
   spin += (event.clientX - lastViewX) / scale * Math.PI * 2;
-  tilt = Math.max(-Math.PI / 2, Math.min(Math.PI / 2,
-    tilt + (event.clientY - lastViewY) / scale * Math.PI));
+  tilt += (event.clientY - lastViewY) / scale * Math.PI;
   lastViewX = event.clientX;
   lastViewY = event.clientY;
 });

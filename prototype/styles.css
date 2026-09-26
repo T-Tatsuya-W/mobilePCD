@@ -22,18 +22,6 @@ body {
   overflow: hidden;
 }
 
-button {
-  font: inherit;
-  color: inherit;
-  border: 1px solid #526070;
-  border-radius: 999px;
-  padding: 0.65rem 1rem;
-  background: #1b222c;
-  cursor: pointer;
-}
-
-button:active { transform: translateY(1px); }
-
 .app-shell {
   height: 100dvh;
   overflow: hidden;
@@ -289,7 +277,6 @@ button:active { transform: translateY(1px); }
 @media (orientation: landscape) and (max-height: 600px) {
   .app-shell { padding: max(4px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)); gap: 4px; }
   .hint, .visual-overlay small { display: none; }
-  button { padding: 0.3rem 0.55rem; font-size: 0.75rem; }
   .workspace { grid-template-columns: 46px minmax(0, 1fr) minmax(0, 1.2fr); gap: 5px; }
   .visual-panel { width: min(100%, calc(100dvh - 12px)); justify-self: center; }
   .control-panel { padding: 5px; gap: 3px; }
@@ -302,9 +289,6 @@ button:active { transform: translateY(1px); }
 
 .radar-header { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
 .radar-header strong { font-size: 0.85rem; }
-.audio-status { font-size: 0.68rem; color: #aeb8c5; }
-.radar-header button { padding: 0.45rem 0.6rem; white-space: nowrap; font-size: 0.72rem; }
 @media (orientation: landscape) and (max-height: 600px) {
   .radar-header strong { font-size: 0.73rem; }
-  .radar-header button { padding: 0.25rem 0.45rem; }
 }

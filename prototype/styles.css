@@ -126,6 +126,7 @@ button:active { transform: translateY(1px); }
   box-shadow: 0 0 8px #9affc9;
   pointer-events: none;
 }
+.theta-marker-ghost { opacity: 0; }
 .theta-value {
   text-align: center;
   font: 0.78rem ui-monospace, monospace;

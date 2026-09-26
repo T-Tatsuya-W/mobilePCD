@@ -5,6 +5,7 @@ const state = {
   dialUnwrapped: 0,
   dialPointerId: null,
   dialLastY: 0,
+  dialLastTime: 0,
   radar: { x: 0, y: 0, held: false, pointerId: null },
 };
 
@@ -49,6 +50,7 @@ dialZone.addEventListener('pointerdown', (event) => {
   if (state.dialPointerId !== null) return;
   state.dialPointerId = event.pointerId;
   state.dialLastY = event.clientY;
+  state.dialLastTime = event.timeStamp;
   dialZone.setPointerCapture(event.pointerId);
   updateDialUi();
 });
@@ -56,11 +58,17 @@ dialZone.addEventListener('pointerdown', (event) => {
 dialZone.addEventListener('pointermove', (event) => {
   if (event.pointerId !== state.dialPointerId) return;
   const dy = event.clientY - state.dialLastY;
+  const dt = Math.max(8, event.timeStamp - state.dialLastTime);
   state.dialLastY = event.clientY;
+  state.dialLastTime = event.timeStamp;
 
-  // Up increases value. Scale by viewport height so the interaction feels similar across phones.
-  const scale = Math.max(220, window.innerHeight) * 0.55;
-  const delta = -dy / scale;
+  // A slow drag maps directly to the visible scale: one track height spans 2π.
+  // Faster movement gains up to 2x distance, with no momentum after release.
+  const speed = Math.abs(dy) / dt; // pixels per millisecond
+  const t = Math.max(0, Math.min(1, (speed - 0.35) / 1.15));
+  const acceleration = 1 + t * t * (3 - 2 * t);
+  const trackHeight = Math.max(1, dialZone.querySelector('.dial-track').clientHeight);
+  const delta = -dy * 2 / trackHeight * acceleration;
   state.dialUnwrapped += delta;
   // One full revolution spans -π to +π; wrapping keeps the swipe continuous.
   state.dialValue = ((state.dialUnwrapped + 1) % 2 + 2) % 2 - 1;
@@ -79,7 +87,7 @@ dialZone.addEventListener('pointercancel', endDial);
 dialZone.addEventListener('lostpointercapture', (event) => {
   if (event.pointerId === state.dialPointerId) {
     state.dialPointerId = null;
-      updateDialUi();
+    updateDialUi();
   }
 });
 

@@ -12,6 +12,7 @@ const state = {
 const dialZone = document.getElementById('dialZone');
 const dialValueEl = document.getElementById('dialValue');
 
+const radarPanel = document.querySelector('.radar-panel');
 const radarPad = document.getElementById('radarPad');
 const radarPoint = document.getElementById('radarPoint');
 const phiValueEl = document.getElementById('phiValue');
@@ -290,6 +291,28 @@ function updateLabels() {
     labelEls[index].style.opacity = world.z > 1 ? '0.35' : '1';
   });
 }
+
+// Fit the circular pad to the radar card itself, rather than the viewport.
+function resizeRadar() {
+  const style = getComputedStyle(radarPanel);
+  const paddingX = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+  const paddingY = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+  const gap = parseFloat(style.gap) || 0;
+  const contentWidth = Math.max(0, radarPanel.clientWidth - paddingX);
+  const contentHeight = Math.max(0, radarPanel.clientHeight - paddingY);
+  const wide = radarPanel.clientWidth > radarPanel.clientHeight;
+  radarPanel.classList.toggle('wide', wide);
+  const headerHeight = radarPanel.querySelector('.radar-header').offsetHeight;
+  const valuesHeight = radarPanel.querySelector('.polar-grid').offsetHeight;
+  const fit = wide
+    ? Math.min(contentWidth - Math.max(82, contentWidth * 0.28) - gap,
+        contentHeight - headerHeight - gap)
+    : Math.min(contentWidth, contentHeight - headerHeight - valuesHeight - 2 * gap);
+  radarPanel.style.setProperty('--radar-fit', Math.max(0, fit) + 'px');
+}
+const radarResizeObserver = new ResizeObserver(resizeRadar);
+radarResizeObserver.observe(radarPanel);
+resizeRadar();
 
 const resizeObserver = new ResizeObserver(resizeThree);
 resizeObserver.observe(container);

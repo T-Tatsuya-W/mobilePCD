@@ -6,6 +6,9 @@
   <meta name="theme-color" content="#111318" />
   <title>mobilePCD Interaction Prototype</title>
   <link rel="stylesheet" href="./styles.css" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
@@ -23,19 +26,16 @@
 
     <section class="workspace" aria-label="Interactive prototype">
       <section id="dialZone" class="control-panel dial-panel" aria-label="Infinite relative control">
-        <div class="panel-title">Relative dial</div>
-        <div class="dial-track">
-          <div class="dial-arrows">▲<br>│<br>│<br>│<br>▼</div>
+        <div class="panel-title">θ</div>
+        <div class="dial-track" aria-hidden="true">
+          <div class="theta-tick" style="top: 0%"><span>+π</span></div>
+          <div class="theta-tick" style="top: 25%"><span>+½π</span></div>
+          <div class="theta-tick" style="top: 50%"><span>0</span></div>
+          <div class="theta-tick" style="top: 75%"><span>−½π</span></div>
+          <div class="theta-tick" style="top: 100%"><span>−π</span></div>
+          <div id="thetaMarker" class="theta-marker"></div>
         </div>
-        <div class="readout">
-          <span>value</span>
-          <strong id="dialValue">0.000</strong>
-        </div>
-        <div class="readout">
-          <span>delta</span>
-          <strong id="dialDelta">0.000</strong>
-        </div>
-        <p class="hint">Swipe up/down indefinitely. A second finger can use the radar simultaneously.</p>
+        <strong id="dialValue" class="theta-value">0.00π</strong>
       </section>
 
       <section class="visual-panel">

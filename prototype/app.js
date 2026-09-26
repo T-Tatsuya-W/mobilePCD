@@ -2,7 +2,6 @@ const THREE = window.THREE;
 
 const state = {
   dialValue: 0,
-  dialDelta: 0,
   dialPointerId: null,
   dialLastY: 0,
   radar: { x: 0, y: 0, held: false, pointerId: null },
@@ -10,7 +9,6 @@ const state = {
 
 const dialZone = document.getElementById('dialZone');
 const dialValueEl = document.getElementById('dialValue');
-const dialDeltaEl = document.getElementById('dialDelta');
 
 const radarPad = document.getElementById('radarPad');
 const radarPoint = document.getElementById('radarPoint');
@@ -28,8 +26,8 @@ let filterNode = null;
 let audioEnabled = false;
 
 function updateDialUi() {
-  dialValueEl.textContent = state.dialValue.toFixed(3);
-  dialDeltaEl.textContent = state.dialDelta.toFixed(3);
+  dialValueEl.textContent = state.dialValue.toFixed(2) + 'π';
+  document.getElementById('thetaMarker').style.top = ((1 - state.dialValue) * 50) + '%';
 }
 
 function updateRadarUi() {
@@ -50,7 +48,6 @@ dialZone.addEventListener('pointerdown', (event) => {
   if (state.dialPointerId !== null) return;
   state.dialPointerId = event.pointerId;
   state.dialLastY = event.clientY;
-  state.dialDelta = 0;
   dialZone.setPointerCapture(event.pointerId);
   updateDialUi();
 });
@@ -63,8 +60,7 @@ dialZone.addEventListener('pointermove', (event) => {
   // Up increases value. Scale by viewport height so the interaction feels similar across phones.
   const scale = Math.max(220, window.innerHeight) * 0.55;
   const delta = -dy / scale;
-  state.dialDelta = delta;
-  state.dialValue += delta;
+  state.dialValue = Math.max(-1, Math.min(1, state.dialValue + delta));
   updateDialUi();
   updateSynth();
 });
@@ -72,7 +68,6 @@ dialZone.addEventListener('pointermove', (event) => {
 function endDial(event) {
   if (event.pointerId !== state.dialPointerId) return;
   state.dialPointerId = null;
-  state.dialDelta = 0;
   updateDialUi();
 }
 
@@ -81,8 +76,7 @@ dialZone.addEventListener('pointercancel', endDial);
 dialZone.addEventListener('lostpointercapture', (event) => {
   if (event.pointerId === state.dialPointerId) {
     state.dialPointerId = null;
-    state.dialDelta = 0;
-    updateDialUi();
+      updateDialUi();
   }
 });
 

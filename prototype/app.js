@@ -14,9 +14,8 @@ const dialValueEl = document.getElementById('dialValue');
 
 const radarPad = document.getElementById('radarPad');
 const radarPoint = document.getElementById('radarPoint');
-const xValueEl = document.getElementById('xValue');
-const yValueEl = document.getElementById('yValue');
-const heldValueEl = document.getElementById('heldValue');
+const phiValueEl = document.getElementById('phiValue');
+const radiusValueEl = document.getElementById('radiusValue');
 
 const audioToggle = document.getElementById('audioToggle');
 const audioStatus = document.getElementById('audioStatus');
@@ -37,9 +36,10 @@ function updateDialUi() {
 }
 
 function updateRadarUi() {
-  xValueEl.textContent = state.radar.x.toFixed(3);
-  yValueEl.textContent = state.radar.y.toFixed(3);
-  heldValueEl.textContent = state.radar.held ? 'yes' : 'no';
+  const phi = Math.atan2(state.radar.y, state.radar.x) / Math.PI;
+  const radius = Math.min(1, Math.hypot(state.radar.x, state.radar.y));
+  phiValueEl.textContent = phi.toFixed(2) + 'π';
+  radiusValueEl.textContent = radius.toFixed(2);
   radarPoint.classList.toggle('active', state.radar.held);
 
   const px = 50 + state.radar.x * 50;

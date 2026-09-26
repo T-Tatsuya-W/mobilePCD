@@ -237,15 +237,21 @@ button:active { transform: translateY(1px); }
   box-shadow: 0 0 0 6px rgba(74, 222, 128, 0.15), 0 0 24px rgba(74, 222, 128, 0.85);
 }
 
-.xy-grid {
+.polar-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  margin-top: auto;
 }
-
-.xy-grid .readout:last-child {
-  grid-column: 1 / -1;
+.polar-grid .readout {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0.35rem 0.15rem;
 }
+.polar-grid .readout strong { font-size: clamp(0.62rem, 2vw, 0.88rem); }
 
 @media (max-width: 720px) {
   .app-shell {
@@ -288,8 +294,8 @@ button:active { transform: translateY(1px); }
   .visual-panel { width: min(100%, calc(100dvh - 12px)); justify-self: center; }
   .control-panel { padding: 5px; gap: 3px; }
   .radar-pad { width: min(100%, calc(100dvh - 70px)); max-height: calc(100dvh - 70px); }
-  .radar-panel .xy-grid { display: none; }
-  .dial-panel .panel-title { font-size: 0.9rem; text-align: center; }
+  .polar-grid .readout { padding: 0.2rem 0.1rem; }
+  .polar-grid .readout strong { font-size: 0.7rem; }
   .theta-tick span { font-size: 0.55rem; }
   .theta-value { font-size: 0.62rem; }
 }

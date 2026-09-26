@@ -2,6 +2,7 @@ const THREE = window.THREE;
 
 const state = {
   dialValue: 0,
+  dialUnwrapped: 0,
   dialPointerId: null,
   dialLastY: 0,
   radar: { x: 0, y: 0, held: false, pointerId: null },
@@ -60,7 +61,9 @@ dialZone.addEventListener('pointermove', (event) => {
   // Up increases value. Scale by viewport height so the interaction feels similar across phones.
   const scale = Math.max(220, window.innerHeight) * 0.55;
   const delta = -dy / scale;
-  state.dialValue = Math.max(-1, Math.min(1, state.dialValue + delta));
+  state.dialUnwrapped += delta;
+  // One full revolution spans -π to +π; wrapping keeps the swipe continuous.
+  state.dialValue = ((state.dialUnwrapped + 1) % 2 + 2) % 2 - 1;
   updateDialUi();
   updateSynth();
 });
@@ -165,7 +168,7 @@ function updateSynth() {
 
   // 110-880 Hz across the X axis; dial adds a continuous transposition offset.
   const baseFrequency = 110 * Math.pow(8, xNorm);
-  const transposition = Math.pow(2, state.dialValue);
+  const transposition = Math.pow(2, state.dialUnwrapped);
   const frequency = Math.min(2400, Math.max(45, baseFrequency * transposition));
   const cutoff = 6000;
 

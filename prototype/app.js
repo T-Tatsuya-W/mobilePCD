@@ -173,7 +173,7 @@ function updateSynth() {
   const baseFrequency = 110 * Math.pow(8, xNorm);
   const transposition = Math.pow(2, state.dialValue);
   const frequency = Math.min(2400, Math.max(45, baseFrequency * transposition));
-  const cutoff = 250 + yNorm * 6000;
+  const cutoff = 6000;
 
   oscillator.frequency.cancelScheduledValues(now);
   oscillator.frequency.setTargetAtTime(frequency, now, 0.015);
@@ -181,7 +181,7 @@ function updateSynth() {
   filterNode.frequency.cancelScheduledValues(now);
   filterNode.frequency.setTargetAtTime(cutoff, now, 0.02);
 
-  const targetGain = state.radar.held && audioEnabled ? 0.13 : 0;
+  const targetGain = state.radar.held && audioEnabled ? 0.13 * yNorm : 0;
   gainNode.gain.cancelScheduledValues(now);
   gainNode.gain.setTargetAtTime(targetGain, now, targetGain > 0 ? 0.02 : 0.06);
 }
@@ -223,15 +223,45 @@ document.addEventListener('visibilitychange', async () => {
 const container = document.getElementById('threeContainer');
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 100);
-camera.position.set(0, 1.25, 5.2);
+camera.position.set(0, 0, 6.1);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.setClearColor(0x000000, 0);
 container.appendChild(renderer.domElement);
 
+const tiltGroup = new THREE.Group();
+scene.add(tiltGroup);
 const group = new THREE.Group();
-scene.add(group);
+tiltGroup.add(group);
+let tilt = 0.75;
+let spin = 0;
+let viewPointerId = null;
+let lastViewX = 0;
+let lastViewY = 0;
+
+container.addEventListener('pointerdown', (event) => {
+  if (viewPointerId !== null) return;
+  viewPointerId = event.pointerId;
+  lastViewX = event.clientX;
+  lastViewY = event.clientY;
+  container.setPointerCapture(event.pointerId);
+});
+container.addEventListener('pointermove', (event) => {
+  if (event.pointerId !== viewPointerId) return;
+  const scale = Math.max(1, container.clientWidth);
+  spin += (event.clientX - lastViewX) / scale * Math.PI * 2;
+  tilt = Math.max(-Math.PI / 2, Math.min(Math.PI / 2,
+    tilt + (event.clientY - lastViewY) / scale * Math.PI));
+  lastViewX = event.clientX;
+  lastViewY = event.clientY;
+});
+function endView(event) {
+  if (event.pointerId === viewPointerId) viewPointerId = null;
+}
+container.addEventListener('pointerup', endView);
+container.addEventListener('pointercancel', endView);
+container.addEventListener('lostpointercapture', endView);
 
 const torus = new THREE.Mesh(
   new THREE.TorusGeometry(1.55, 0.68, 30, 90),
@@ -328,15 +358,10 @@ const resizeObserver = new ResizeObserver(resizeThree);
 resizeObserver.observe(container);
 resizeThree();
 
-let previous = performance.now();
-function animate(now) {
-  const dt = Math.min(0.05, (now - previous) / 1000);
-  previous = now;
-
-  // Keep the prototype visually alive without stealing touch input from the controls.
-  group.rotation.y += dt * 0.18;
-  group.rotation.x = 0.18 + state.radar.y * 0.12;
-  group.rotation.z = state.radar.x * 0.10;
+function animate() {
+  tiltGroup.rotation.x = tilt;
+  group.rotation.z = spin;
+  tiltGroup.updateMatrixWorld(true);
 
   renderer.render(scene, camera);
   updateLabels();

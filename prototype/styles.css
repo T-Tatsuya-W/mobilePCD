@@ -330,3 +330,11 @@ body {
 .radar-node { position: absolute; transform: translate(-50%, -50%); z-index: 2; min-width: 12px; min-height: 12px; padding: 1px 2px; border-radius: 999px; display: grid; place-items: center; font: 600 clamp(7px, 1.4vw, 10px)/1 ui-monospace, monospace; color: #0b1015; white-space: nowrap; text-shadow: 0 1px rgba(255,255,255,.25); }
 .radar-node[hidden] { display: none; }
 .radar-point { z-index: 3; }
+
+.settings-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.8rem; }
+.settings-toggle-row button, .mic-toggle { min-height: 34px; padding: 5px 10px; border: 1px solid #475875; border-radius: 8px; background: #1b222c; color: #f4f7fb; font: inherit; cursor: pointer; }
+.settings-toggle-row button[aria-pressed="true"], .mic-toggle[aria-pressed="true"] { border-color: #ff525e; color: #ffadb2; }
+.mic-toggle { align-self: flex-start; }
+.mic-status { color: #aab9d3; font-size: 0.76rem; }
+.mic-indicator { position: absolute; z-index: 6; top: 12px; left: 12px; width: 13px; height: 13px; border-radius: 50%; background: #ff3345; opacity: .35; box-shadow: 0 0 3px #ff3345; pointer-events: none; }
+.mic-indicator[hidden] { display: none; }

@@ -6,4 +6,5 @@ Standalone mobilePCD control and torus experiment. Serve the repository over HTT
 - The 12 chromatic note nodes come from `./json/notes.json`. Each note began as a one-hot, 12-bin PCD and was transformed with the local copy of `pcd-dft.js`.
 - `torus-coordinates.js` maps DFT bins to θ = phase 5, Φ = phase 3, r = magnitude 3. Its `toroidalToCartesian(theta, phi, r)` function maps these values to the prototype torus in the XY plane. r = 0 is the tube centreline, r = 1 its surface; Φ = 0 points outward.
 - The renderer and all of its data and transformation code live inside `prototype/`. The root `json/notes.json` is populated in the same schema as `json/chords.json` for the existing app.
-- The prototype does not yet connect the live microphone PCD or interactive controls to the plotted note positions.
+- A single reusable red marker follows θ, Φ and r from the controls. It dims when the radar is released; dragging the view only changes the camera pose of the same marker.
+- The prototype does not yet connect live microphone PCD to the plotted note positions.

@@ -618,6 +618,45 @@ const group = new THREE.Group();
 tiltGroup.add(group);
 let tilt = -0.85;
 let spin = -Math.PI / 2;
+const spinSpeedInput = document.getElementById('spinSpeed');
+const spinSpeedValue = document.getElementById('spinSpeedValue');
+const spinRangeInput = document.getElementById('spinRange');
+const spinRangeValue = document.getElementById('spinRangeValue');
+const spinDirectionButton = document.getElementById('spinDirection');
+let spinSign = 1;
+let spinAnchor = spin;
+let spinPhase = 0;
+let lastSpinFrame = null;
+
+function resetSpinSweep() {
+  spinAnchor = spin;
+  spinPhase = 0;
+}
+spinSpeedInput.addEventListener('input', () => {
+  spinSpeedValue.textContent = Number(spinSpeedInput.value).toFixed(2) + 'π/s';
+});
+spinRangeInput.addEventListener('input', () => {
+  spinRangeValue.textContent = Number(spinRangeInput.value).toFixed(2) + 'π';
+  resetSpinSweep();
+});
+spinDirectionButton.addEventListener('click', () => {
+  spinSign *= -1;
+  spinDirectionButton.textContent = spinSign === 1 ? 'Forward ↻' : 'Reverse ↺';
+  spinDirectionButton.setAttribute('aria-pressed', String(spinSign === -1));
+  resetSpinSweep();
+});
+function advanceSpin(deltaSeconds) {
+  const distance = Number(spinSpeedInput.value) * Math.PI * deltaSeconds;
+  if (distance <= 0 || viewPointerId !== null) return;
+  const range = Number(spinRangeInput.value) * Math.PI;
+  if (range === 0) {
+    spin += spinSign * distance;
+  } else {
+    spinPhase = (spinPhase + distance) % (2 * range);
+    const travel = spinPhase <= range ? spinPhase : 2 * range - spinPhase;
+    spin = spinAnchor + spinSign * travel;
+  }
+}
 let viewPointerId = null;
 let lastViewX = 0;
 let lastViewY = 0;
@@ -634,6 +673,7 @@ torusWindow.addEventListener('pointermove', (event) => {
   const scale = Math.max(1, torusWindow.clientWidth);
   spin += (event.clientX - lastViewX) / scale * Math.PI * 2;
   tilt += (event.clientY - lastViewY) / scale * Math.PI;
+  resetSpinSweep();
   lastViewX = event.clientX;
   lastViewY = event.clientY;
 });
@@ -1048,7 +1088,9 @@ const resizeObserver = new ResizeObserver(resizeThree);
 resizeObserver.observe(torusWindow);
 resizeThree();
 
-function animate() {
+function animate(timestamp) {
+  if (lastSpinFrame !== null) advanceSpin(Math.min(0.05, (timestamp - lastSpinFrame) / 1000));
+  lastSpinFrame = timestamp;
   tiltGroup.rotation.x = tilt;
   group.rotation.z = spin;
   tiltGroup.updateMatrixWorld(true);

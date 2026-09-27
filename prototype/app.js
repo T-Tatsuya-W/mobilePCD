@@ -623,6 +623,8 @@ function applyAccidentalMode() {
   pcdNameEls.forEach((el, index) => {
     el.textContent = (useFlats ? flatPcdNames : sharpPcdNames)[index];
   });
+  if (showPointerPcd) updatePointerPcd();
+  else drawPcd(latestMicPcd);
 }
 accidentalModeButton.addEventListener('click', () => {
   useFlats = !useFlats;

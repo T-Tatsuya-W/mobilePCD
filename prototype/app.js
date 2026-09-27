@@ -361,13 +361,15 @@ function updateMicIndicator() {
   micIndicator.style.boxShadow = '0 0 ' + (3 + 17 * level) + 'px #ff3345';
 }
 
-function clearLiveMarker() {
-  liveCoordinates = null;
-  if (typeof liveMarker !== 'undefined') liveMarker.visible = false;
+function dimLiveMarker() {
+  // Preserve the last valid position through silence and after mic capture stops.
+  if (!liveCoordinates) return;
+  liveMarker.material.color.setHex(0x9aa4b3);
+  liveMarker.material.opacity = 0.45;
 }
 
 async function stopMic(message = 'Mic off') {
-  clearLiveMarker();
+  dimLiveMarker();
   micRms = 0;
   latestMicPcd.fill(0);
   if (!showPointerPcd) {
@@ -429,7 +431,7 @@ audioProcessor.addEventListener('analysis', ({ detail: { pcd, rms, audioTime } }
       : peak < 0.0001 ? 'Mic active · no pitch bins' : 'Mic active';
   }
   if (rms < audioProcessor.config.pcdMinRms || audioTime === null) {
-    clearLiveMarker();
+    dimLiveMarker();
     return;
   }
   // Process at most 20 visual updates per second; keep only the latest PCD.
@@ -437,13 +439,16 @@ audioProcessor.addEventListener('analysis', ({ detail: { pcd, rms, audioTime } }
   lastPcdTime = audioTime;
   const { amplitudes, phases } = pcdToFrequencyDomain(Array.from(pcd));
   if (amplitudes[5] < 0.00001) {
-    clearLiveMarker();
+    dimLiveMarker();
     return;
   }
   liveCoordinates = { theta: phases[5], phi: phases[3], r: amplitudes[3] };
   updateLiveMarker();
+  liveMarker.material.color.setHex(0xffffff);
+  liveMarker.material.opacity = 1;
 });
 audioProcessor.addEventListener('error', ({ detail: error }) => {
+  dimLiveMarker();
   micStatus.textContent = 'Analysis error: ' + (error?.message || 'unknown');
   console.error('Mic analysis failed:', error);
 });
@@ -560,7 +565,7 @@ function updatePointer() {
 // A single marker follows the latest microphone PCD; radius edits reposition it.
 const liveMarker = new THREE.Mesh(
   new THREE.SphereGeometry(0.14, 20, 16),
-  new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false })
+  new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, depthTest: false })
 );
 liveMarker.renderOrder = 3;
 liveMarker.visible = false;

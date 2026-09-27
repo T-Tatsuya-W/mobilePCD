@@ -9,9 +9,15 @@ export class TorusAudioOutput {
     this.octaves = [4];
     this.threshold = 0.16;
     this.volume = 0.25;
+    this.held = false;
   }
 
   isRunning() { return this.context !== null; }
+
+  setHeld(held) {
+    this.held = Boolean(held);
+    this.applyLevels();
+  }
 
   setThreshold(value) {
     this.threshold = Math.max(0, Math.min(0.4, value));
@@ -51,6 +57,7 @@ export class TorusAudioOutput {
       master.gain.value = this.volume;
       master.connect(context.destination);
       await context.resume();
+      if (context.state !== 'running') throw new Error('Audio output did not start');
       this.context = context;
       this.master = master;
       this.setOctaves(this.octaves);
@@ -92,12 +99,19 @@ export class TorusAudioOutput {
   applyLevels() {
     if (!this.context) return;
     let active = 0;
-    for (let i = 0; i < 12; i++) if (this.pcd[i] >= this.threshold) active++;
+    let strongest = 0;
+    for (let i = 0; i < 12; i++) {
+      if (this.pcd[i] >= this.threshold) {
+        active++;
+        strongest = Math.max(strongest, this.pcd[i]);
+      }
+    }
     const divisor = Math.sqrt(Math.max(1, active * this.octaves.length));
     const now = this.context.currentTime;
     for (const voice of this.voices.values()) {
       const value = this.pcd[voice.pitchClass];
-      const target = value >= this.threshold ? value / divisor : 0;
+      const target = this.held && strongest > 0 && value >= this.threshold
+        ? (value / strongest) / divisor : 0;
       if (Math.abs(target - voice.lastTarget) < 0.002) continue;
       voice.gain.gain.setTargetAtTime(target, now, 0.025);
       voice.lastTarget = target;

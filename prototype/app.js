@@ -133,9 +133,10 @@ audioToggle.addEventListener('click', async () => {
       }
       await audioOutput.start();
       audioOutput.update(pointerPcd);
+      audioOutput.setHeld(state.radar.held);
       audioToggle.textContent = 'Stop audio';
       audioToggle.setAttribute('aria-pressed', 'true');
-      audioStatus.textContent = 'Playing pointer PCD';
+      audioStatus.textContent = state.radar.held ? 'Playing pointer PCD' : 'Ready · hold radar to play';
     }
   } catch (error) {
     await audioOutput.stop();
@@ -202,6 +203,9 @@ function updateRadarUi() {
   radarPad.classList.toggle('active', state.radar.held);
   updatePointer();
   updatePointerPcd();
+  audioOutput.setHeld(state.radar.held);
+  if (audioOutput.isRunning()) audioStatus.textContent = state.radar.held
+    ? 'Playing pointer PCD' : 'Ready · hold radar to play';
 
   const px = 50 + state.radar.x * 50;
   const py = 50 - state.radar.y * 50;

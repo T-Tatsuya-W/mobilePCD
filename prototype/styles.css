@@ -72,6 +72,8 @@ body {
 
 .dial-panel,
 .radar-pad {
+  opacity: 0.72;
+  transition: opacity 120ms ease;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
@@ -187,6 +189,8 @@ body {
     repeating-radial-gradient(circle at center, transparent 0 24%, rgba(120, 140, 170, 0.12) 24.5% 25%, transparent 25.5% 49%);
 }
 
+.radar-pad.active { opacity: 1; }
+
 .axis {
   position: absolute;
   background: rgba(170, 185, 205, 0.23);
@@ -221,8 +225,8 @@ body {
 }
 
 .radar-point.active {
-  background: #9affc9;
-  box-shadow: 0 0 0 6px rgba(74, 222, 128, 0.15), 0 0 24px rgba(74, 222, 128, 0.85);
+  background: #ff525e;
+  box-shadow: 0 0 0 6px rgba(255, 82, 94, 0.16), 0 0 24px rgba(255, 82, 94, 0.85);
 }
 
 .polar-grid {

@@ -52,6 +52,20 @@ const pointerPcd = new Float32Array(12);
 const audioOutput = new TorusAudioOutput();
 const audioToggle = document.getElementById('audioToggle');
 const audioStatus = document.getElementById('audioStatus');
+const notePersistInput = document.getElementById('notePersist');
+let noteLatched = false;
+function shouldPlayAudio() {
+  return audioEnabled && (state.radar.held || (notePersistInput.checked && noteLatched));
+}
+function updateAudioStatus() {
+  if (!audioOutput.isRunning()) return;
+  audioStatus.textContent = state.radar.held ? 'Playing pointer PCD' :
+    notePersistInput.checked && noteLatched ? 'Holding last note' : 'Ready · hold radar to play';
+}
+function displayedPointerPcd() {
+  return notePersistInput.checked && noteLatched && !state.radar.held && audioOutput.isRunning()
+    ? audioOutput.pcd : pointerPcd;
+}
 const noteThresholdMinInput = document.getElementById('noteThresholdMin');
 const noteThresholdMaxInput = document.getElementById('noteThresholdMax');
 const noteThresholdMinValue = document.getElementById('noteThresholdMinValue');
@@ -175,8 +189,11 @@ function updatePointerPcd() {
     sum += pointerPcd[i];
   }
   if (sum > 0) for (let i = 0; i < 12; i++) pointerPcd[i] /= sum;
-  audioOutput.update(pointerPcd);
-  if (showPointerPcd && showPcdInput.checked) drawPcd(pointerPcd);
+  // Keep the last played PCD when the radar is released in persist mode.
+  if (state.radar.held || !notePersistInput.checked || !noteLatched || !audioOutput.isRunning()) {
+    audioOutput.update(pointerPcd);
+  }
+  if (showPointerPcd && showPcdInput.checked) drawPcd(displayedPointerPcd());
 }
 function updateNoteThreshold() {
   const min = Number(noteThresholdMinInput.value);
@@ -192,7 +209,7 @@ function updateAudioSettings() {
   updateNoteThreshold();
   audioOutput.setVolume(Number(outputVolumeInput.value));
   audioOutput.setOctaves(octaveInputs.filter(input => input.checked).map(input => Number(input.value)));
-  if (showPointerPcd && showPcdInput.checked) drawPcd(pointerPcd);
+  if (showPointerPcd && showPcdInput.checked) drawPcd(displayedPointerPcd());
   outputVolumeValue.textContent = Math.round(Number(outputVolumeInput.value) * 100) + '%';
 }
 noteThresholdMinInput.addEventListener('input', () => {
@@ -225,8 +242,8 @@ async function startAudio() {
   try {
     await audioOutput.start();
     audioOutput.update(pointerPcd);
-    audioOutput.setHeld(state.radar.held);
-    audioStatus.textContent = state.radar.held ? 'Playing pointer PCD' : 'Ready · hold radar to play';
+    audioOutput.setHeld(shouldPlayAudio());
+    updateAudioStatus();
   } catch (error) {
     await audioOutput.stop();
     audioStatus.textContent = 'Audio unavailable: ' + (error.name || 'error');
@@ -244,6 +261,8 @@ audioToggle.addEventListener('click', async () => {
   if (audioEnabled) {
     await startAudio();
   } else {
+    noteLatched = false;
+    audioOutput.setHeld(false);
     audioStatus.textContent = 'Audio off';
     audioPending = true;
     audioToggle.disabled = true;
@@ -254,6 +273,11 @@ audioToggle.addEventListener('click', async () => {
       audioToggle.disabled = false;
     }
   }
+});
+notePersistInput.addEventListener('change', () => {
+  audioOutput.setHeld(shouldPlayAudio());
+  if (showPointerPcd && showPcdInput.checked) drawPcd(displayedPointerPcd());
+  updateAudioStatus();
 });
 pcdSourceToggle.addEventListener('click', () => {
   showPointerPcd = !showPointerPcd;
@@ -313,9 +337,8 @@ function updateRadarUi() {
   updatePointer();
   updateNoteThreshold();
   updatePointerPcd();
-  audioOutput.setHeld(state.radar.held);
-  if (audioOutput.isRunning()) audioStatus.textContent = state.radar.held
-    ? 'Playing pointer PCD' : 'Ready · hold radar to play';
+  audioOutput.setHeld(shouldPlayAudio());
+  updateAudioStatus();
 
   const px = 50 + state.radar.x * 50;
   const py = 50 - state.radar.y * 50;
@@ -405,6 +428,7 @@ radarPad.addEventListener('pointerdown', (event) => {
   if (state.radar.pointerId !== null) return;
   state.radar.pointerId = event.pointerId;
   state.radar.held = true;
+  noteLatched = audioEnabled;
   radarPad.setPointerCapture(event.pointerId);
   setRadarFromEvent(event);
   updateRadarUi();
@@ -420,6 +444,7 @@ function endRadar(event) {
   if (event.pointerId !== state.radar.pointerId) return;
   state.radar.pointerId = null;
   state.radar.held = false;
+  if (event.type === 'pointercancel') noteLatched = false;
   updateRadarUi();
 }
 
@@ -429,6 +454,7 @@ radarPad.addEventListener('lostpointercapture', (event) => {
   if (event.pointerId === state.radar.pointerId) {
     state.radar.pointerId = null;
     state.radar.held = false;
+    noteLatched = false;
     updateRadarUi();
   }
 });
@@ -437,6 +463,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
     state.radar.held = false;
     state.radar.pointerId = null;
+    noteLatched = false;
     updateRadarUi();
   }
 });

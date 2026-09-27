@@ -24,13 +24,20 @@ const majorRadiusInput = document.getElementById('majorRadius');
 const minorRadiusInput = document.getElementById('minorRadius');
 const majorRadiusValue = document.getElementById('majorRadiusValue');
 const minorRadiusValue = document.getElementById('minorRadiusValue');
-const plotModeInput = document.getElementById('plotMode');
-const accidentalModeInput = document.getElementById('accidentalMode');
+const plotInputs = {
+  notes: document.getElementById('plotNotes'),
+  chords: document.getElementById('plotChords'),
+};
+const accidentalModeButton = document.getElementById('accidentalMode');
+let useFlats = false;
 const radarRangeInput = document.getElementById('radarRange');
 const radarRangeValue = document.getElementById('radarRangeValue');
 const thetaMarker = document.getElementById('thetaMarker');
 const thetaMarkerGhost = document.getElementById('thetaMarkerGhost');
 const torusSize = { major: TORUS_MAJOR_RADIUS, minor: TORUS_MINOR_RADIUS };
+const micToggle = document.getElementById('micToggle');
+const micStatus = document.getElementById('micStatus');
+const micIndicator = document.getElementById('micIndicator');
 
 function updateThetaSlider() {
   thetaValueEl.textContent = state.thetaValue.toFixed(2) + 'π';
@@ -178,6 +185,89 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+// Keep only one analyser buffer. Audio never connects to speakers or storage.
+let micStream = null;
+let micContext = null;
+let micSource = null;
+let micAnalyser = null;
+let micSamples = null;
+let micPending = false;
+let micPageHidden = false;
+
+function stopMic(message = 'Mic off') {
+  if (micStream) {
+    micStream.getTracks().forEach(track => track.stop());
+    micStream = null;
+  }
+  if (micSource) micSource.disconnect();
+  if (micAnalyser) micAnalyser.disconnect();
+  if (micContext) micContext.close().catch(console.error);
+  micSource = micAnalyser = micContext = micSamples = null;
+  micIndicator.hidden = true;
+  micIndicator.style.opacity = '0.35';
+  micIndicator.style.boxShadow = '0 0 3px #ff3345';
+  micToggle.textContent = 'Start mic';
+  micToggle.setAttribute('aria-pressed', 'false');
+  micStatus.textContent = message;
+}
+
+micToggle.addEventListener('click', async () => {
+  if (micStream) {
+    stopMic();
+    return;
+  }
+  if (micPending) return;
+  micPending = true;
+  micToggle.disabled = true;
+  micStatus.textContent = 'Requesting mic…';
+  let stream = null;
+  let context = null;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (micPageHidden) throw new Error('Page closed');
+    context = new (window.AudioContext || window.webkitAudioContext)();
+    const source = context.createMediaStreamSource(stream);
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 1024;
+    source.connect(analyser);
+    await context.resume();
+    micStream = stream;
+    micContext = context;
+    micSource = source;
+    micAnalyser = analyser;
+    micSamples = new Float32Array(analyser.fftSize);
+    stream.getAudioTracks().forEach(track => {
+      track.addEventListener('ended', () => stopMic('Mic disconnected'), { once: true });
+    });
+    micIndicator.hidden = false;
+    micToggle.textContent = 'Stop mic';
+    micToggle.setAttribute('aria-pressed', 'true');
+    micStatus.textContent = 'Mic active';
+  } catch (error) {
+    stream?.getTracks().forEach(track => track.stop());
+    if (context) context.close().catch(console.error);
+    micStatus.textContent = 'Mic unavailable: ' + (error.name || 'access denied');
+  } finally {
+    micPending = false;
+    micToggle.disabled = false;
+  }
+});
+
+function updateMicIndicator() {
+  if (!micAnalyser || !micSamples) return;
+  micAnalyser.getFloatTimeDomainData(micSamples);
+  let sum = 0;
+  for (let i = 0; i < micSamples.length; i++) sum += micSamples[i] * micSamples[i];
+  const rms = Math.sqrt(sum / micSamples.length);
+  const level = Math.min(1, rms * 7);
+  micIndicator.style.opacity = String(0.35 + level * 0.65);
+  micIndicator.style.boxShadow = '0 0 ' + (3 + 17 * level) + 'px #ff3345';
+}
+window.addEventListener('pagehide', () => {
+  micPageHidden = true;
+  if (micStream) stopMic();
+});
+
 // ---------------- Three.js prototype scene ----------------
 
 const torusWindow = document.getElementById('torusWindow');
@@ -293,7 +383,7 @@ function updateRadarNodes() {
   const range = Number(radarRangeInput.value) * Math.PI;
   for (const point of plottedPoints) {
     const angularDistance = Math.abs(Math.atan2(Math.sin(point.theta - theta), Math.cos(point.theta - theta)));
-    const visibleKind = plotModeInput.value === 'both' || plotModeInput.value === point.kind;
+    const visibleKind = plotInputs[point.kind].checked;
     const opacity = Math.max(0, 1 - angularDistance / range);
     point.radarEl.hidden = !visibleKind || opacity <= 0;
     if (!point.radarEl.hidden) point.radarEl.style.opacity = opacity.toFixed(3);
@@ -324,7 +414,7 @@ function updateConnectionVisibility() {
     if (connectionLines[kind]) {
       connectionLines[kind].visible =
         connectionInputs[kind].checked &&
-        (plotModeInput.value === 'both' || plotModeInput.value === kind);
+        (plotInputs[kind].checked);
     }
   }
 }
@@ -392,23 +482,29 @@ async function loadConnections() {
 
 function applyPlotMode() {
   for (const point of plottedPoints) {
-    const visible = plotModeInput.value === 'both' || plotModeInput.value === point.kind;
+    const visible = plotInputs[point.kind].checked;
     point.marker.visible = visible;
     point.labelEl.hidden = !visible;
   }
   updateConnectionVisibility();
   updateRadarNodes();
 }
-plotModeInput.addEventListener('change', applyPlotMode);
+plotInputs.notes.addEventListener('change', applyPlotMode);
+plotInputs.chords.addEventListener('change', applyPlotMode);
 
 function applyAccidentalMode() {
   for (const point of plottedPoints) {
-    const label = accidentalModeInput.value === 'flats' ? point.flatLabel : point.sharpLabel;
+    const label = useFlats ? point.flatLabel : point.sharpLabel;
     point.labelEl.textContent = label;
     point.radarEl.textContent = label;
   }
 }
-accidentalModeInput.addEventListener('change', applyAccidentalMode);
+accidentalModeButton.addEventListener('click', () => {
+  useFlats = !useFlats;
+  accidentalModeButton.textContent = useFlats ? 'Flats (♭)' : 'Sharps (♯)';
+  accidentalModeButton.setAttribute('aria-pressed', String(useFlats));
+  applyAccidentalMode();
+});
 
 async function loadPlotPoints() {
   const datasets = await Promise.all(['notes', 'chords'].map(async kind => {
@@ -570,6 +666,7 @@ function animate() {
   group.rotation.z = spin;
   tiltGroup.updateMatrixWorld(true);
 
+  updateMicIndicator();
   renderer.render(scene, camera);
   updateLabels();
   requestAnimationFrame(animate);

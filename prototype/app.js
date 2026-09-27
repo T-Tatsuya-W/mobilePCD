@@ -27,6 +27,7 @@ function updateDialUi() {
   ghost.style.top = state.dialValue >= 0 ? '100%' : '0%';
   ghost.style.opacity = Math.abs(state.dialValue) > 0.9 ? '0.55' : '0';
   updatePointer();
+  updateThetaSlice();
 }
 
 function updateRadarUi() {
@@ -216,6 +217,39 @@ const torus = new THREE.Mesh(
   })
 );
 group.add(torus);
+
+// The red loop traces the outer surface of the tube at the current θ.
+const SLICE_SEGMENTS = 96;
+const slicePositions = new Float32Array(SLICE_SEGMENTS * 3);
+const sliceGeometry = new THREE.BufferGeometry();
+const sliceAttribute = new THREE.BufferAttribute(slicePositions, 3);
+sliceAttribute.setUsage(THREE.DynamicDrawUsage);
+sliceGeometry.setAttribute('position', sliceAttribute);
+const thetaSlice = new THREE.LineLoop(
+  sliceGeometry,
+  new THREE.LineBasicMaterial({
+    color: 0xff525e, transparent: true, opacity: 0.95,
+    depthTest: false, depthWrite: false,
+  })
+);
+thetaSlice.frustumCulled = false;
+thetaSlice.renderOrder = 1;
+group.add(thetaSlice);
+
+function updateThetaSlice() {
+  const theta = state.dialValue * Math.PI;
+  const cosTheta = Math.cos(theta);
+  const sinTheta = Math.sin(theta);
+  for (let i = 0; i < SLICE_SEGMENTS; i++) {
+    const phi = 2 * Math.PI * i / SLICE_SEGMENTS;
+    const radial = TORUS_MAJOR_RADIUS + TORUS_MINOR_RADIUS * Math.cos(phi);
+    const offset = i * 3;
+    slicePositions[offset] = radial * cosTheta;
+    slicePositions[offset + 1] = radial * sinTheta;
+    slicePositions[offset + 2] = TORUS_MINOR_RADIUS * Math.sin(phi);
+  }
+  sliceAttribute.needsUpdate = true;
+}
 
 // One persistent mesh follows θ, Φ and r; only its position and opacity change.
 const pointerMaterial = new THREE.MeshBasicMaterial({

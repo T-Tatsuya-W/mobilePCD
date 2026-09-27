@@ -633,7 +633,7 @@ function resetSpinSweep() {
   spinPhase = 0;
 }
 spinSpeedInput.addEventListener('input', () => {
-  spinSpeedValue.textContent = Number(spinSpeedInput.value).toFixed(2) + 'π/s';
+  spinSpeedValue.textContent = Number(spinSpeedInput.value).toFixed(3) + 'π/s';
 });
 spinRangeInput.addEventListener('input', () => {
   spinRangeValue.textContent = Number(spinRangeInput.value) >= 2.05 ? '∞' :
@@ -656,8 +656,11 @@ function advanceSpin(deltaSeconds) {
   } else {
     const range = selectedRange * Math.PI;
     spinPhase = (spinPhase + distance) % (2 * range);
-    const travel = spinPhase <= range ? spinPhase : 2 * range - spinPhase;
-    spin = spinAnchor + spinSign * travel;
+    // The current view is the centre: traverse +range/2, then -range/2, then back.
+    const halfRange = range / 2;
+    const offset = spinPhase <= halfRange ? spinPhase :
+      spinPhase <= 3 * halfRange ? range - spinPhase : spinPhase - 2 * range;
+    spin = spinAnchor + spinSign * offset;
   }
 }
 let viewPointerId = null;

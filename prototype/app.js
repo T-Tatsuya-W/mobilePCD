@@ -1,4 +1,4 @@
-import { TORUS_MAJOR_RADIUS, TORUS_MINOR_RADIUS, toroidalToCartesian } from './torus-coordinates.js';
+import { TORUS_MAJOR_RADIUS, TORUS_MINOR_RADIUS, toroidalToCartesian } from './torus-coordinates.js?v=pointer-1';
 const THREE = window.THREE;
 
 const state = {
@@ -26,6 +26,7 @@ function updateDialUi() {
   const ghost = document.getElementById('thetaMarkerGhost');
   ghost.style.top = state.dialValue >= 0 ? '100%' : '0%';
   ghost.style.opacity = Math.abs(state.dialValue) > 0.9 ? '0.55' : '0';
+  updatePointer();
 }
 
 function updateRadarUi() {
@@ -34,6 +35,8 @@ function updateRadarUi() {
   phiValueEl.textContent = phi.toFixed(2) + 'π';
   radiusValueEl.textContent = radius.toFixed(2);
   radarPoint.classList.toggle('active', state.radar.held);
+  radarPad.classList.toggle('active', state.radar.held);
+  updatePointer();
 
   const px = 50 + state.radar.x * 50;
   const py = 50 - state.radar.y * 50;
@@ -174,8 +177,8 @@ const tiltGroup = new THREE.Group();
 scene.add(tiltGroup);
 const group = new THREE.Group();
 tiltGroup.add(group);
-let tilt = 0.75;
-let spin = 0;
+let tilt = 0.85;
+let spin = Math.PI / 2;
 let viewPointerId = null;
 let lastViewX = 0;
 let lastViewY = 0;
@@ -190,7 +193,7 @@ container.addEventListener('pointerdown', (event) => {
 container.addEventListener('pointermove', (event) => {
   if (event.pointerId !== viewPointerId) return;
   const scale = Math.max(1, container.clientWidth);
-  spin += (event.clientX - lastViewX) / scale * Math.PI * 2;
+  spin -= (event.clientX - lastViewX) / scale * Math.PI * 2;
   tilt += (event.clientY - lastViewY) / scale * Math.PI;
   lastViewX = event.clientX;
   lastViewY = event.clientY;
@@ -213,6 +216,21 @@ const torus = new THREE.Mesh(
   })
 );
 group.add(torus);
+
+// One persistent mesh follows θ, Φ and r; only its position and opacity change.
+const pointerMaterial = new THREE.MeshBasicMaterial({
+  color: 0xff525e, transparent: true, opacity: 0.55,
+});
+const pointer = new THREE.Mesh(new THREE.SphereGeometry(0.12, 20, 16), pointerMaterial);
+group.add(pointer);
+
+function updatePointer() {
+  const theta = state.dialValue * Math.PI;
+  const phi = Math.atan2(state.radar.y, state.radar.x);
+  const r = Math.min(1, Math.hypot(state.radar.x, state.radar.y));
+  toroidalToCartesian(theta, phi, r, pointer.position);
+  pointerMaterial.opacity = state.radar.held ? 1 : 0.55;
+}
 
 const pointMaterial = new THREE.MeshBasicMaterial({ color: 0xf4f7fb });
 const pointGeometry = new THREE.SphereGeometry(0.07, 18, 14);
@@ -279,17 +297,18 @@ function resizeThree() {
   camera.updateProjectionMatrix();
 }
 
+const projectedPoint = new THREE.Vector3();
 function updateLabels() {
   const rect = container.getBoundingClientRect();
   notePoints.forEach((item, index) => {
-    const world = item.pos.clone();
-    group.localToWorld(world);
-    world.project(camera);
-    const x = (world.x * 0.5 + 0.5) * rect.width;
-    const y = (-world.y * 0.5 + 0.5) * rect.height;
+    projectedPoint.copy(item.pos);
+    group.localToWorld(projectedPoint);
+    projectedPoint.project(camera);
+    const x = (projectedPoint.x * 0.5 + 0.5) * rect.width;
+    const y = (-projectedPoint.y * 0.5 + 0.5) * rect.height;
     labelEls[index].style.left = x + 'px';
     labelEls[index].style.top = y + 'px';
-    labelEls[index].style.opacity = world.z > 1 ? '0.35' : '1';
+    labelEls[index].style.opacity = projectedPoint.z > 1 ? '0.35' : '1';
   });
 }
 

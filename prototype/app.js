@@ -229,13 +229,14 @@ Object.assign(labelLayer.style, {
 container.appendChild(labelLayer);
 
 async function loadNotePoints() {
-  const response = await fetch('./json/notes.json');
+  const response = await fetch('./json/notes.json', { cache: 'no-store' });
   if (!response.ok) throw new Error('Could not load notes.json: ' + response.status);
   const { Mag3, Pha3, Pha5, Labels } = await response.json();
   if (![Mag3, Pha3, Pha5, Labels].every(values => Array.isArray(values) && values.length === 12)) {
     throw new Error('Expected twelve values in each notes.json array');
   }
 
+  console.info('Loaded ' + Labels.length + ' chromatic note nodes');
   Labels.forEach((label, index) => {
     const point = toroidalToCartesian(Pha5[index], Pha3[index], Mag3[index]);
     const pos = new THREE.Vector3(point.x, point.y, point.z);
@@ -261,7 +262,13 @@ async function loadNotePoints() {
     labelEls.push(el);
   });
 }
-loadNotePoints().catch(error => console.error('Note plotting failed:', error));
+loadNotePoints().catch(error => {
+  console.error('Note plotting failed:', error);
+  const message = document.createElement('div');
+  message.className = 'note-load-error';
+  message.textContent = 'Notes could not load. Reload this page.';
+  container.appendChild(message);
+});
 
 function resizeThree() {
   const rect = container.getBoundingClientRect();

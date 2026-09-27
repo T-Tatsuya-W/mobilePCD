@@ -310,3 +310,5 @@ body {
   align-self: center;
   justify-self: center;
 }
+
+.note-load-error { position: absolute; inset: auto 10px 12px; text-align: center; color: #ffb4b4; background: #22191d; padding: 6px; border-radius: 8px; pointer-events: none; }

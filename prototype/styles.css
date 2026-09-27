@@ -373,3 +373,8 @@ body {
 .pcd-strip:not(.mic-source) .pcd-bar-fill { background: #873740; }
 .pcd-strip:not(.mic-source) .pcd-column.active-note .pcd-bar-fill { background: #ff525e; box-shadow: 0 0 7px rgba(255,82,94,.9); }
 .pcd-strip:not(.mic-source) .pcd-column.active-note { color: #fff; font-weight: 800; text-shadow: 0 0 4px #ff525e; }
+
+/* Root choices stay visible and easy to tap in the scrollable torus settings. */
+.root-note-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
+.root-note-grid button { min-width: 0; min-height: 32px; border: 1px solid #475875; border-radius: 8px; background: #1b222c; color: #f4f7fb; font: 600 0.78rem/1 ui-monospace, monospace; cursor: pointer; }
+.root-note-grid button[aria-pressed="true"] { border-color: #ff525e; background: #612c38; color: #fff; }

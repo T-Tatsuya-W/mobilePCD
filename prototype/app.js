@@ -67,6 +67,40 @@ let showPointerPcd = true;
 const sharpPcdNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
 const flatPcdNames = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
 
+const rootNoteValue = document.getElementById('rootNoteValue');
+const rootNoteButtons = document.getElementById('rootNoteButtons');
+const rootButtons = [];
+let rootPitchClass = 0;
+let rootThetaOffset = 0;
+let rootPhiOffset = 0;
+const fullTurn = Math.PI * 2;
+function wrapAngle(angle) {
+  return Math.atan2(Math.sin(angle), Math.cos(angle));
+}
+function displayAngles(theta, phi) {
+  return { theta: wrapAngle(theta - rootThetaOffset), phi: wrapAngle(phi - rootPhiOffset) };
+}
+for (let pitchClass = 0; pitchClass < 12; pitchClass++) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'root-note-button';
+  button.dataset.pitchClass = String(pitchClass);
+  button.addEventListener('click', () => setTorusRoot(pitchClass));
+  rootNoteButtons.appendChild(button);
+  rootButtons.push(button);
+}
+function updateRootNames() {
+  const names = useFlats ? flatPcdNames : sharpPcdNames;
+  rootNoteValue.textContent = names[rootPitchClass];
+  rootButtons.forEach((button, pitchClass) => {
+    button.textContent = names[pitchClass];
+    button.setAttribute('aria-label', names[pitchClass] + ' as torus root');
+    button.setAttribute('aria-pressed', String(pitchClass === rootPitchClass));
+  });
+}
+updateRootNames();
+
+
 const thetaTrack = thetaSliderPanel.querySelector('.theta-slider-track');
 const thetaLabelModeButton = document.getElementById('thetaLabelMode');
 let showThetaNotes = true;
@@ -85,7 +119,7 @@ for (let step = 6; step >= -6; step--) {
 function updateThetaTickLabels() {
   const names = useFlats ? flatPcdNames : sharpPcdNames;
   for (const { step, label } of thetaTickLabels) {
-    const pitchClass = ((step * 7) % 12 + 12) % 12;
+    const pitchClass = ((rootPitchClass + step * 7) % 12 + 12) % 12;
     label.textContent = showThetaNotes ? names[pitchClass] :
       step === 0 ? '0' : (step > 0 ? '+' : '−') + thetaFractions[Math.abs(step)];
   }
@@ -128,8 +162,8 @@ function drawPcd(values) {
   }
 }
 function updatePointerPcd() {
-  const theta = state.thetaValue * Math.PI;
-  const phi = Math.atan2(state.radar.y, state.radar.x);
+  const theta = state.thetaValue * Math.PI + rootThetaOffset;
+  const phi = Math.atan2(state.radar.y, state.radar.x) + rootPhiOffset;
   const radius = Math.min(1, Math.hypot(state.radar.x, state.radar.y));
   let sum = 0;
   // Inverse real DFT for DC=1, bin 3 magnitude=r, bin 5 magnitude=1.
@@ -653,8 +687,9 @@ liveMarker.visible = false;
 group.add(liveMarker);
 function updateLiveMarker() {
   if (!liveCoordinates) return;
+  const angles = displayAngles(liveCoordinates.theta, liveCoordinates.phi);
   toroidalToCartesian(
-    liveCoordinates.theta, liveCoordinates.phi, liveCoordinates.r,
+    angles.theta, angles.phi, liveCoordinates.r,
     liveMarker.position, torusSize.major, torusSize.minor
   );
   liveMarker.visible = true;
@@ -787,6 +822,7 @@ function applyAccidentalMode() {
     point.labelEl.textContent = label;
     point.radarEl.textContent = label;
   }
+  updateRootNames();
   pcdNameEls.forEach((el, index) => {
     el.textContent = (useFlats ? flatPcdNames : sharpPcdNames)[index];
   });
@@ -814,8 +850,9 @@ async function loadPlotPoints() {
 
   for (const { kind, data: { Mag3, Pha3, Pha5, Labels, LabelsFlat } } of datasets) {
     Labels.forEach((label, index) => {
-      const theta = Pha5[index];
-      const phi = Pha3[index];
+      const absoluteTheta = Pha5[index];
+      const absolutePhi = Pha3[index];
+      const { theta, phi } = displayAngles(absoluteTheta, absolutePhi);
       const r = Mag3[index];
       const point = toroidalToCartesian(theta, phi, r, {}, torusSize.major, torusSize.minor);
       const pos = new THREE.Vector3(point.x, point.y, point.z);
@@ -838,13 +875,41 @@ async function loadPlotPoints() {
       radarEl.style.backgroundColor = '#' + color.getHexString();
       radarEl.hidden = true;
       radarNodes.appendChild(radarEl);
-      plottedPoints.push({ kind, pos, marker, labelEl, radarEl, sharpLabel: label, flatLabel: LabelsFlat[index], theta, phi, r });
+      plottedPoints.push({ kind, pos, marker, labelEl, radarEl, sharpLabel: label, flatLabel: LabelsFlat[index], absoluteTheta, absolutePhi, theta, phi, r });
     });
   }
   applyPlotMode();
   applyAccidentalMode();
   await loadConnections();
 }
+// Rebase only the torus display. Absolute PCD angles still drive the same music maths.
+function setTorusRoot(pitchClass) {
+  if (pitchClass === rootPitchClass) return;
+  rootPitchClass = pitchClass;
+  // A semitone shifts DFT phases 5 and 3 by -5π/6 and -π/2 respectively.
+  // One perfect fifth (G) therefore shifts θ by +π/6 and Φ by +π/2.
+  rootThetaOffset = -fullTurn * 5 * pitchClass / 12;
+  rootPhiOffset = -fullTurn * 3 * pitchClass / 12;
+  updateRootNames();
+  updateThetaTickLabels();
+  for (const point of plottedPoints) {
+    const angles = displayAngles(point.absoluteTheta, point.absolutePhi);
+    point.theta = angles.theta;
+    point.phi = angles.phi;
+    toroidalToCartesian(point.theta, point.phi, point.r, point.pos, torusSize.major, torusSize.minor);
+    point.marker.position.copy(point.pos);
+    point.radarEl.style.left = (50 + 50 * point.r * Math.cos(point.phi)) + '%';
+    point.radarEl.style.top = (50 - 50 * point.r * Math.sin(point.phi)) + '%';
+    const hue = ((point.theta + Math.PI) / fullTurn + 1) % 1;
+    point.marker.material.color.setHSL(hue, 0.85, 0.6);
+    point.radarEl.style.backgroundColor = '#' + point.marker.material.color.getHexString();
+  }
+  updateConnectionPositions();
+  updateRadarNodes();
+  updateLiveMarker();
+  updatePointerPcd();
+}
+
 // Settings change the geometry and the same polar positions used by every node.
 let resizeQueued = false;
 function applyTorusSize() {

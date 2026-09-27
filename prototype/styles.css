@@ -359,3 +359,10 @@ body {
 .pcd-strip[hidden] { display: none; }
 .torus-window-panel.pcd-hidden .torus-settings { bottom: 10px; }
 .pcd-bars { height: 100%; }
+
+/* Compact bars leave more of the torus unobscured. */
+.pcd-strip { height: clamp(28px, 9%, 42px); }
+.torus-settings { bottom: clamp(39px, calc(9% + 10px), 53px); }
+.audio-octave-heading { font-size: .8rem; color: #dce8f7; }
+.audio-octaves { display: flex; justify-content: space-between; gap: 4px; }
+.audio-octaves label { display: inline-flex; align-items: center; gap: 2px; font-size: .8rem; }

@@ -28,3 +28,5 @@ Standalone mobilePCD control and torus experiment. Serve the repository over HTT
 - PCD bars are red for the pointer source and blue for the microphone source; there is no title in the strip. The Show PCD checkbox hides the strip and gives the settings overlay the full torus window height. Mic analysis status remains in the Mic to torus settings section.
 
 - The PCD strip is now about half as tall. Torus to audio uses the same pointer-derived 12-bin PCD with sustained Web Audio sine voices, following the older babysynth's MIDI pitch-class convention (C4 = MIDI 60), but changes each voice's gain continuously instead of retriggering a sound on every drag. Start/Stop audio is independent of the mic and PCD display; note threshold, output volume and octave 2–6 checkboxes control the output. Audio nodes exist only while output is on and are released on stop/page exit.
+
+- The microphone torus marker keeps its last valid position and dims to grey when input is silent or capture stops. New valid audio brightens and moves that same marker again; torus size edits still reposition it.

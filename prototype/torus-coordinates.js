@@ -11,12 +11,11 @@ export function pcdToToroidal(pcd) {
   return { theta: phases[5], phi: phases[3], r: amplitudes[3] };
 }
 
-export function toroidalToCartesian(theta, phi, r) {
+export function toroidalToCartesian(theta, phi, r, out = {}) {
   const tubeRadius = r * TORUS_MINOR_RADIUS;
   const distance = TORUS_MAJOR_RADIUS + tubeRadius * Math.cos(phi);
-  return {
-    x: distance * Math.cos(theta),
-    y: distance * Math.sin(theta),
-    z: tubeRadius * Math.sin(phi),
-  };
+  out.x = distance * Math.cos(theta);
+  out.y = distance * Math.sin(theta);
+  out.z = tubeRadius * Math.sin(phi);
+  return out;
 }

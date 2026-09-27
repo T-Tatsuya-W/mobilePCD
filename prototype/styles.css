@@ -31,12 +31,6 @@ body {
   display: block;
 }
 
-.hint {
-  margin: 0.25rem 0 0;
-  color: #aeb8c5;
-  font-size: 0.85rem;
-}
-
 .workspace {
   min-height: 0;
   height: 100%;
@@ -47,7 +41,7 @@ body {
 }
 
 .control-panel,
-.visual-panel {
+.torus-window-panel {
   min-height: 0;
   position: relative;
   border: 1px solid #2b3542;
@@ -63,23 +57,14 @@ body {
   gap: 10px;
 }
 
-.panel-title {
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #94a6bb;
-}
-
-.dial-panel,
+.theta-slider-panel,
 .radar-pad {
-  opacity: 0.72;
-  transition: opacity 120ms ease;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
 }
 
-.dial-track {
+.theta-slider-track {
   flex: 1;
   min-height: 0;
   position: relative;
@@ -117,12 +102,6 @@ body {
   pointer-events: none;
 }
 .theta-marker-ghost { opacity: 0; }
-.theta-value {
-  text-align: center;
-  font: 0.78rem ui-monospace, monospace;
-  white-space: nowrap;
-}
-
 .readout {
   display: flex;
   align-items: baseline;
@@ -144,9 +123,9 @@ body {
   font-size: 0.88rem;
 }
 
-.visual-panel { aspect-ratio: 1; min-width: 0; width: 100%; align-self: start; }
+.torus-window-panel { aspect-ratio: 1; min-width: 0; width: 100%; align-self: start; }
 
-.three-container {
+.torus-window {
   position: absolute;
   inset: 0;
   overflow: hidden;
@@ -154,30 +133,19 @@ body {
   user-select: none;
 }
 
-.three-container canvas {
+.torus-window canvas {
   display: block;
   width: 100%;
   height: 100%;
 }
 
-.visual-overlay {
-  position: absolute;
-  left: 12px;
-  top: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  pointer-events: none;
-  text-shadow: 0 1px 4px #000;
-}
-
-.visual-overlay small { color: #aeb8c5; }
-
-.radar-panel {
+.main-panel {
   justify-content: flex-start;
 }
 
 .radar-pad {
+  opacity: 0.72;
+  transition: opacity 120ms ease;
   width: min(100%, var(--radar-fit, 48dvh));
   aspect-ratio: 1;
   align-self: center;
@@ -229,13 +197,13 @@ body {
   box-shadow: 0 0 0 6px rgba(255, 82, 94, 0.16), 0 0 24px rgba(255, 82, 94, 0.85);
 }
 
-.polar-grid {
+.main-values {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 5px;
   margin-top: auto;
 }
-.polar-grid .readout {
+.main-values .readout {
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -243,7 +211,7 @@ body {
   gap: 2px;
   padding: 0.35rem 0.15rem;
 }
-.polar-grid .readout strong { font-size: clamp(0.62rem, 2vw, 0.88rem); }
+.main-values .readout strong { font-size: clamp(0.62rem, 2vw, 0.88rem); }
 
 /* The same gap and panel treatment applies in both arrangements. */
 @media (orientation: portrait), (max-width: 620px) {
@@ -256,19 +224,19 @@ body {
     grid-template-rows: auto minmax(0, 1fr);
     gap: 8px;
   }
-  .visual-panel {
+  .torus-window-panel {
     grid-column: 1 / -1;
     grid-row: 1;
     width: min(100%, 55dvh);
     justify-self: center;
   }
-  .dial-panel { grid-column: 1; grid-row: 2; }
-  .radar-panel { grid-column: 2; grid-row: 2; }
+  .theta-slider-panel { grid-column: 1; grid-row: 2; }
+  .main-panel { grid-column: 2; grid-row: 2; }
   .radar-pad { width: min(100%, var(--radar-fit, calc(45dvh - 80px))); }
   .control-panel { padding: 8px; gap: 6px; }
-  .dial-track { margin: 4px 0; }
-  .polar-grid .readout { padding: 0.3rem 0.1rem; }
-  .polar-grid .readout strong { font-size: 0.7rem; }
+  .theta-slider-track { margin: 4px 0; }
+  .main-values .readout { padding: 0.3rem 0.1rem; }
+  .main-values .readout strong { font-size: 0.7rem; }
 }
 
 @media (orientation: landscape) and (max-height: 600px) and (min-width: 621px) {
@@ -282,31 +250,30 @@ body {
   }
   .control-panel { padding: 5px; gap: 3px; }
   .radar-pad { width: min(100%, var(--radar-fit, calc(100dvh - 70px))); }
-  .polar-grid .readout { padding: 0.2rem 0.1rem; }
-  .polar-grid .readout strong { font-size: 0.7rem; }
-  .visual-overlay small { display: none; }
+  .main-values .readout { padding: 0.2rem 0.1rem; }
+  .main-values .readout strong { font-size: 0.7rem; }
   .theta-tick span { font-size: 0.55rem; }
 }
 
-.radar-header { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
-.radar-header strong { font-size: 0.85rem; }
+.main-header { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
+.main-header strong { font-size: 0.85rem; }
 
 /* A landscape-shaped radar card places the numbers beside the circle. */
-.radar-panel.wide {
+.main-panel.wide {
   display: grid;
   grid-template-columns: minmax(82px, 28%) minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
   align-items: center;
 }
-.radar-panel.wide .radar-header { grid-column: 1 / -1; grid-row: 1; }
-.radar-panel.wide .polar-grid {
+.main-panel.wide .main-header { grid-column: 1 / -1; grid-row: 1; }
+.main-panel.wide .main-values {
   grid-column: 1;
   grid-row: 2;
   grid-template-columns: minmax(0, 1fr);
   align-self: stretch;
   margin-top: 0;
 }
-.radar-panel.wide .radar-pad {
+.main-panel.wide .radar-pad {
   grid-column: 2;
   grid-row: 2;
   width: min(100%, var(--radar-fit));
@@ -316,3 +283,37 @@ body {
 }
 
 .note-load-error { position: absolute; inset: auto 10px 12px; text-align: center; color: #ffb4b4; background: #22191d; padding: 6px; border-radius: 8px; pointer-events: none; }
+
+/* The settings overlay occupies the torus window without changing the grid. */
+.torus-settings {
+  position: absolute;
+  z-index: 5;
+  inset: 10px;
+  padding: clamp(10px, 2vw, 18px);
+  border: 1px solid #475875;
+  border-radius: 14px;
+  background: rgba(17, 21, 29, 0.95);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.torus-settings[hidden] { display: none; }
+.torus-settings h2 { font-size: 0.95rem; margin: 0 0 3px; }
+.torus-settings label { display: flex; justify-content: space-between; gap: 8px; font-size: 0.8rem; }
+.torus-settings output { font-family: ui-monospace, monospace; }
+.torus-settings input[type="range"] { width: 100%; min-height: 28px; accent-color: #ff525e; touch-action: auto; }
+.main-values button {
+  min-width: 0;
+  padding: 0.3rem 0.1rem;
+  border: 1px solid #354357;
+  border-radius: 9px;
+  background: #1b222c;
+  color: #d8e2ed;
+  font: inherit;
+  font-size: clamp(0.56rem, 1.5vw, 0.78rem);
+  cursor: pointer;
+}
+.main-values button.active { border-color: #ff525e; color: #ffadb2; }
+@media (max-width: 620px) { .main-values button { font-size: 0.62rem; } }

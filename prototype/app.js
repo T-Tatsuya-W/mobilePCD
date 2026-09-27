@@ -1,31 +1,38 @@
-import { TORUS_MAJOR_RADIUS, TORUS_MINOR_RADIUS, toroidalToCartesian } from './torus-coordinates.js?v=pointer-1';
+import { TORUS_MAJOR_RADIUS, TORUS_MINOR_RADIUS, toroidalToCartesian } from './torus-coordinates.js?v=torus-settings-1';
 const THREE = window.THREE;
 
 const state = {
-  dialValue: 0,
-  dialUnwrapped: 0,
-  dialPointerId: null,
-  dialLastY: 0,
-  dialLastTime: 0,
+  thetaValue: 0,
+  thetaUnwrapped: 0,
+  thetaPointerId: null,
+  thetaLastY: 0,
+  thetaLastTime: 0,
   radar: { x: 0, y: 0, held: false, pointerId: null },
 };
 
-const dialZone = document.getElementById('dialZone');
-const dialValueEl = document.getElementById('dialValue');
+const thetaSliderPanel = document.getElementById('thetaSliderPanel');
+const thetaValueEl = document.getElementById('thetaValue');
 
-const radarPanel = document.querySelector('.radar-panel');
+const mainPanel = document.querySelector('.main-panel');
 const radarPad = document.getElementById('radarPad');
 const radarPoint = document.getElementById('radarPoint');
 const phiValueEl = document.getElementById('phiValue');
 const radiusValueEl = document.getElementById('radiusValue');
+const settingsToggle = document.getElementById('settingsToggle');
+const torusSettings = document.getElementById('torusSettings');
+const majorRadiusInput = document.getElementById('majorRadius');
+const minorRadiusInput = document.getElementById('minorRadius');
+const majorRadiusValue = document.getElementById('majorRadiusValue');
+const minorRadiusValue = document.getElementById('minorRadiusValue');
+const torusSize = { major: TORUS_MAJOR_RADIUS, minor: TORUS_MINOR_RADIUS };
 
-function updateDialUi() {
-  dialValueEl.textContent = state.dialValue.toFixed(2) + 'π';
-  document.getElementById('thetaMarker').style.top = ((1 - state.dialValue) * 50) + '%';
+function updateThetaSlider() {
+  thetaValueEl.textContent = state.thetaValue.toFixed(2) + 'π';
+  document.getElementById('thetaMarker').style.top = ((1 - state.thetaValue) * 50) + '%';
   // Show the same point at both ends near ±π, like a seam on a circular scale.
   const ghost = document.getElementById('thetaMarkerGhost');
-  ghost.style.top = state.dialValue >= 0 ? '100%' : '0%';
-  ghost.style.opacity = Math.abs(state.dialValue) > 0.9 ? '0.55' : '0';
+  ghost.style.top = state.thetaValue >= 0 ? '100%' : '0%';
+  ghost.style.opacity = Math.abs(state.thetaValue) > 0.9 ? '0.55' : '0';
   updatePointer();
   updateThetaSlice();
 }
@@ -46,60 +53,60 @@ function updateRadarUi() {
 
 }
 
-dialZone.addEventListener('pointerdown', (event) => {
-  if (state.dialPointerId !== null) return;
-  state.dialPointerId = event.pointerId;
-  state.dialLastY = event.clientY;
-  state.dialLastTime = event.timeStamp;
-  dialZone.setPointerCapture(event.pointerId);
-  updateDialUi();
+thetaSliderPanel.addEventListener('pointerdown', (event) => {
+  if (state.thetaPointerId !== null) return;
+  state.thetaPointerId = event.pointerId;
+  state.thetaLastY = event.clientY;
+  state.thetaLastTime = event.timeStamp;
+  thetaSliderPanel.setPointerCapture(event.pointerId);
+  updateThetaSlider();
 });
 
-dialZone.addEventListener('pointermove', (event) => {
-  if (event.pointerId !== state.dialPointerId) return;
-  const dy = event.clientY - state.dialLastY;
-  const dt = Math.max(8, event.timeStamp - state.dialLastTime);
-  state.dialLastY = event.clientY;
-  state.dialLastTime = event.timeStamp;
+thetaSliderPanel.addEventListener('pointermove', (event) => {
+  if (event.pointerId !== state.thetaPointerId) return;
+  const dy = event.clientY - state.thetaLastY;
+  const dt = Math.max(8, event.timeStamp - state.thetaLastTime);
+  state.thetaLastY = event.clientY;
+  state.thetaLastTime = event.timeStamp;
 
   // A slow drag maps directly to the visible scale: one track height spans 2π.
   // Faster movement gains up to 2x distance, with no momentum after release.
   const speed = Math.abs(dy) / dt; // pixels per millisecond
   const t = Math.max(0, Math.min(1, (speed - 0.35) / 1.15));
   const acceleration = 1 + t * t * (3 - 2 * t);
-  const trackHeight = Math.max(1, dialZone.querySelector('.dial-track').clientHeight);
+  const trackHeight = Math.max(1, thetaSliderPanel.querySelector('.theta-slider-track').clientHeight);
   const delta = -dy * 2 / trackHeight * acceleration;
   moveTheta(delta);
 });
 
 function moveTheta(delta) {
-  state.dialUnwrapped += delta;
+  state.thetaUnwrapped += delta;
   // One full revolution spans -π to +π, in either direction.
-  state.dialValue = ((state.dialUnwrapped + 1) % 2 + 2) % 2 - 1;
-  updateDialUi();
+  state.thetaValue = ((state.thetaUnwrapped + 1) % 2 + 2) % 2 - 1;
+  updateThetaSlider();
 }
 
 // Mouse wheel and trackpads can keep turning the same circular scale.
-dialZone.addEventListener('wheel', (event) => {
+thetaSliderPanel.addEventListener('wheel', (event) => {
   event.preventDefault();
-  const height = Math.max(1, dialZone.querySelector('.dial-track').clientHeight);
+  const height = Math.max(1, thetaSliderPanel.querySelector('.theta-slider-track').clientHeight);
   const pixels = event.deltaMode === 1 ? event.deltaY * 16 :
     event.deltaMode === 2 ? event.deltaY * height : event.deltaY;
   moveTheta(-pixels * 2 / height);
 }, { passive: false });
 
-function endDial(event) {
-  if (event.pointerId !== state.dialPointerId) return;
-  state.dialPointerId = null;
-  updateDialUi();
+function endThetaSwipe(event) {
+  if (event.pointerId !== state.thetaPointerId) return;
+  state.thetaPointerId = null;
+  updateThetaSlider();
 }
 
-dialZone.addEventListener('pointerup', endDial);
-dialZone.addEventListener('pointercancel', endDial);
-dialZone.addEventListener('lostpointercapture', (event) => {
-  if (event.pointerId === state.dialPointerId) {
-    state.dialPointerId = null;
-    updateDialUi();
+thetaSliderPanel.addEventListener('pointerup', endThetaSwipe);
+thetaSliderPanel.addEventListener('pointercancel', endThetaSwipe);
+thetaSliderPanel.addEventListener('lostpointercapture', (event) => {
+  if (event.pointerId === state.thetaPointerId) {
+    state.thetaPointerId = null;
+    updateThetaSlider();
   }
 });
 
@@ -164,7 +171,7 @@ document.addEventListener('visibilitychange', () => {
 
 // ---------------- Three.js prototype scene ----------------
 
-const container = document.getElementById('threeContainer');
+const torusWindow = document.getElementById('torusWindow');
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 100);
 camera.position.set(0, 0, 6.1);
@@ -172,7 +179,7 @@ camera.position.set(0, 0, 6.1);
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.setClearColor(0x000000, 0);
-container.appendChild(renderer.domElement);
+torusWindow.appendChild(renderer.domElement);
 
 const tiltGroup = new THREE.Group();
 scene.add(tiltGroup);
@@ -184,16 +191,16 @@ let viewPointerId = null;
 let lastViewX = 0;
 let lastViewY = 0;
 
-container.addEventListener('pointerdown', (event) => {
+torusWindow.addEventListener('pointerdown', (event) => {
   if (viewPointerId !== null) return;
   viewPointerId = event.pointerId;
   lastViewX = event.clientX;
   lastViewY = event.clientY;
-  container.setPointerCapture(event.pointerId);
+  torusWindow.setPointerCapture(event.pointerId);
 });
-container.addEventListener('pointermove', (event) => {
+torusWindow.addEventListener('pointermove', (event) => {
   if (event.pointerId !== viewPointerId) return;
-  const scale = Math.max(1, container.clientWidth);
+  const scale = Math.max(1, torusWindow.clientWidth);
   spin += (event.clientX - lastViewX) / scale * Math.PI * 2;
   tilt += (event.clientY - lastViewY) / scale * Math.PI;
   lastViewX = event.clientX;
@@ -202,12 +209,12 @@ container.addEventListener('pointermove', (event) => {
 function endView(event) {
   if (event.pointerId === viewPointerId) viewPointerId = null;
 }
-container.addEventListener('pointerup', endView);
-container.addEventListener('pointercancel', endView);
-container.addEventListener('lostpointercapture', endView);
+torusWindow.addEventListener('pointerup', endView);
+torusWindow.addEventListener('pointercancel', endView);
+torusWindow.addEventListener('lostpointercapture', endView);
 
 const torus = new THREE.Mesh(
-  new THREE.TorusGeometry(TORUS_MAJOR_RADIUS, TORUS_MINOR_RADIUS, 30, 90),
+  new THREE.TorusGeometry(torusSize.major, torusSize.minor, 30, 90),
   new THREE.MeshBasicMaterial({
     color: 0x738cff,
     transparent: true,
@@ -237,16 +244,16 @@ thetaSlice.renderOrder = 1;
 group.add(thetaSlice);
 
 function updateThetaSlice() {
-  const theta = state.dialValue * Math.PI;
+  const theta = state.thetaValue * Math.PI;
   const cosTheta = Math.cos(theta);
   const sinTheta = Math.sin(theta);
   for (let i = 0; i < SLICE_SEGMENTS; i++) {
     const phi = 2 * Math.PI * i / SLICE_SEGMENTS;
-    const radial = TORUS_MAJOR_RADIUS + TORUS_MINOR_RADIUS * Math.cos(phi);
+    const radial = torusSize.major + torusSize.minor * Math.cos(phi);
     const offset = i * 3;
     slicePositions[offset] = radial * cosTheta;
     slicePositions[offset + 1] = radial * sinTheta;
-    slicePositions[offset + 2] = TORUS_MINOR_RADIUS * Math.sin(phi);
+    slicePositions[offset + 2] = torusSize.minor * Math.sin(phi);
   }
   sliceAttribute.needsUpdate = true;
 }
@@ -259,10 +266,10 @@ const pointer = new THREE.Mesh(new THREE.SphereGeometry(0.12, 20, 16), pointerMa
 group.add(pointer);
 
 function updatePointer() {
-  const theta = state.dialValue * Math.PI;
+  const theta = state.thetaValue * Math.PI;
   const phi = Math.atan2(state.radar.y, state.radar.x);
   const r = Math.min(1, Math.hypot(state.radar.x, state.radar.y));
-  toroidalToCartesian(theta, phi, r, pointer.position);
+  toroidalToCartesian(theta, phi, r, pointer.position, torusSize.major, torusSize.minor);
   pointerMaterial.opacity = state.radar.held ? 1 : 0.55;
 }
 
@@ -278,7 +285,7 @@ Object.assign(labelLayer.style, {
   inset: '0',
   pointerEvents: 'none',
 });
-container.appendChild(labelLayer);
+torusWindow.appendChild(labelLayer);
 
 async function loadNotePoints() {
   const response = await fetch('./json/notes.json', { cache: 'no-store' });
@@ -290,12 +297,14 @@ async function loadNotePoints() {
 
   console.info('Loaded ' + Labels.length + ' chromatic note nodes');
   Labels.forEach((label, index) => {
-    const point = toroidalToCartesian(Pha5[index], Pha3[index], Mag3[index]);
+    const point = toroidalToCartesian(
+      Pha5[index], Pha3[index], Mag3[index], {}, torusSize.major, torusSize.minor
+    );
     const pos = new THREE.Vector3(point.x, point.y, point.z);
     const marker = new THREE.Mesh(pointGeometry, pointMaterial);
     marker.position.copy(pos);
     group.add(marker);
-    notePoints.push({ label, pos });
+    notePoints.push({ label, pos, marker, theta: Pha5[index], phi: Pha3[index], r: Mag3[index] });
 
     const el = document.createElement('div');
     el.textContent = label;
@@ -314,16 +323,66 @@ async function loadNotePoints() {
     labelEls.push(el);
   });
 }
+// Settings change the geometry and the same polar positions used by every node.
+let resizeQueued = false;
+function applyTorusSize() {
+  resizeQueued = false;
+  const oldGeometry = torus.geometry;
+  torus.geometry = new THREE.TorusGeometry(torusSize.major, torusSize.minor, 30, 90);
+  oldGeometry.dispose();
+
+  for (const note of notePoints) {
+    toroidalToCartesian(
+      note.theta, note.phi, note.r, note.pos, torusSize.major, torusSize.minor
+    );
+    note.marker.position.copy(note.pos);
+  }
+  updateThetaSlice();
+  updatePointer();
+
+  // Keep the full torus in the square viewing window at larger sizes.
+  const halfFov = THREE.MathUtils.degToRad(camera.fov / 2);
+  camera.position.z = Math.max(
+    6.1,
+    (torusSize.major + torusSize.minor) * 1.12 / Math.tan(halfFov) + torusSize.minor
+  );
+  camera.updateProjectionMatrix();
+}
+
+function queueTorusResize() {
+  if (resizeQueued) return;
+  resizeQueued = true;
+  requestAnimationFrame(applyTorusSize);
+}
+
+settingsToggle.addEventListener('click', () => {
+  torusSettings.hidden = !torusSettings.hidden;
+  settingsToggle.setAttribute('aria-expanded', String(!torusSettings.hidden));
+  settingsToggle.classList.toggle('active', !torusSettings.hidden);
+});
+
+function updateTorusSettings() {
+  torusSize.major = Number(majorRadiusInput.value);
+  minorRadiusInput.max = Math.min(1, torusSize.major - 0.1).toFixed(2);
+  torusSize.minor = Math.min(Number(minorRadiusInput.value), Number(minorRadiusInput.max));
+  minorRadiusInput.value = String(torusSize.minor);
+  majorRadiusValue.textContent = torusSize.major.toFixed(2);
+  minorRadiusValue.textContent = torusSize.minor.toFixed(2);
+  queueTorusResize();
+}
+majorRadiusInput.addEventListener('input', updateTorusSettings);
+minorRadiusInput.addEventListener('input', updateTorusSettings);
+
 loadNotePoints().catch(error => {
   console.error('Note plotting failed:', error);
   const message = document.createElement('div');
   message.className = 'note-load-error';
   message.textContent = 'Notes could not load. Reload this page.';
-  container.appendChild(message);
+  torusWindow.appendChild(message);
 });
 
 function resizeThree() {
-  const rect = container.getBoundingClientRect();
+  const rect = torusWindow.getBoundingClientRect();
   const width = Math.max(1, rect.width);
   const height = Math.max(1, rect.height);
   renderer.setSize(width, height, false);
@@ -333,7 +392,7 @@ function resizeThree() {
 
 const projectedPoint = new THREE.Vector3();
 function updateLabels() {
-  const rect = container.getBoundingClientRect();
+  const rect = torusWindow.getBoundingClientRect();
   notePoints.forEach((item, index) => {
     projectedPoint.copy(item.pos);
     group.localToWorld(projectedPoint);
@@ -347,29 +406,29 @@ function updateLabels() {
 }
 
 // Fit the circular pad to the radar card itself, rather than the viewport.
-function resizeRadar() {
-  const style = getComputedStyle(radarPanel);
+function resizeMainPanel() {
+  const style = getComputedStyle(mainPanel);
   const paddingX = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
   const paddingY = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
   const gap = parseFloat(style.gap) || 0;
-  const contentWidth = Math.max(0, radarPanel.clientWidth - paddingX);
-  const contentHeight = Math.max(0, radarPanel.clientHeight - paddingY);
-  const wide = radarPanel.clientWidth > radarPanel.clientHeight;
-  radarPanel.classList.toggle('wide', wide);
-  const headerHeight = radarPanel.querySelector('.radar-header').offsetHeight;
-  const valuesHeight = radarPanel.querySelector('.polar-grid').offsetHeight;
+  const contentWidth = Math.max(0, mainPanel.clientWidth - paddingX);
+  const contentHeight = Math.max(0, mainPanel.clientHeight - paddingY);
+  const wide = mainPanel.clientWidth > mainPanel.clientHeight;
+  mainPanel.classList.toggle('wide', wide);
+  const headerHeight = mainPanel.querySelector('.main-header').offsetHeight;
+  const valuesHeight = mainPanel.querySelector('.main-values').offsetHeight;
   const fit = wide
     ? Math.min(contentWidth - Math.max(82, contentWidth * 0.28) - gap,
         contentHeight - headerHeight - gap)
     : Math.min(contentWidth, contentHeight - headerHeight - valuesHeight - 2 * gap);
-  radarPanel.style.setProperty('--radar-fit', Math.max(0, fit) + 'px');
+  mainPanel.style.setProperty('--radar-fit', Math.max(0, fit) + 'px');
 }
-const radarResizeObserver = new ResizeObserver(resizeRadar);
-radarResizeObserver.observe(radarPanel);
-resizeRadar();
+const mainPanelResizeObserver = new ResizeObserver(resizeMainPanel);
+mainPanelResizeObserver.observe(mainPanel);
+resizeMainPanel();
 
 const resizeObserver = new ResizeObserver(resizeThree);
-resizeObserver.observe(container);
+resizeObserver.observe(torusWindow);
 resizeThree();
 
 function animate() {
@@ -382,6 +441,6 @@ function animate() {
   requestAnimationFrame(animate);
 }
 
-updateDialUi();
+updateThetaSlider();
 updateRadarUi();
 requestAnimationFrame(animate);

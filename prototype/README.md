@@ -22,3 +22,5 @@ Standalone mobilePCD control and torus experiment. Serve the repository over HTT
 - A compact 12-bin PCD strip overlays the bottom of the torus window. The PCD display button switches between live mic pitch-class weights and a pointer-derived approximation. Pointer reconstruction uses DC magnitude 1, third harmonic magnitude r and phase Φ, and fifth harmonic magnitude 1 and phase θ; unavailable harmonics remain zero, negative inverse values are clipped and the positive bins renormalized. The display reflects the sharp/flat label setting and retains only the latest mic frame.
 
 - The PCD strip defaults to the pointer reconstruction, so it displays bars before the microphone starts. The torus settings overlay leaves the strip exposed while open; use its PCD display button to view the live mic PCD instead.
+
+- PCD bar heights are scaled to the strongest current pitch class so quiet/spread-out PCDs remain visible; the underlying values stay unchanged. The mic display reports waiting for frames, low input level, missing pitch bins, or analysis errors instead of silently showing empty bars.

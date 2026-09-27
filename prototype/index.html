@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#111318" />
   <title>mobilePCD Interaction Prototype</title>
-  <link rel="stylesheet" href="./styles.css?v=pointer-1" />
+  <link rel="stylesheet" href="./styles.css?v=torus-settings-1" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" href="./icon.svg" type="image/svg+xml" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -14,8 +14,8 @@
 <body>
   <main class="app-shell">
     <section class="workspace" aria-label="Interactive prototype">
-      <section id="dialZone" class="control-panel dial-panel" aria-label="Theta relative control">
-        <div class="dial-track" aria-hidden="true">
+      <section id="thetaSliderPanel" class="control-panel theta-slider-panel" aria-label="Theta slider panel">
+        <div class="theta-slider-track" aria-hidden="true">
           <div class="theta-tick" style="top: 0%"><span>+π</span></div>
           <div class="theta-tick" style="top: 25%"><span>+½π</span></div>
           <div class="theta-tick" style="top: 50%"><span>0</span></div>
@@ -26,12 +26,19 @@
         </div>
       </section>
 
-      <section class="visual-panel">
-        <div id="threeContainer" class="three-container"></div>
+      <section class="torus-window-panel" aria-label="Torus window panel">
+        <div id="torusWindow" class="torus-window"></div>
+        <div id="torusSettings" class="torus-settings" hidden>
+          <h2>Torus proportions</h2>
+          <label for="majorRadius">Major radius <output id="majorRadiusValue">1.55</output></label>
+          <input id="majorRadius" type="range" min="0.90" max="2.20" step="0.01" value="1.55" />
+          <label for="minorRadius">Minor radius <output id="minorRadiusValue">0.68</output></label>
+          <input id="minorRadius" type="range" min="0.15" max="1.00" step="0.01" value="0.68" />
+        </div>
       </section>
 
-      <section class="control-panel radar-panel">
-        <div class="radar-header">
+      <section class="control-panel main-panel" aria-label="Main panel">
+        <div class="main-header">
           <strong>mobilePCD</strong>
         </div>
         <div id="radarPad" class="radar-pad" aria-label="Circular XY pad">
@@ -39,16 +46,17 @@
           <div class="axis axis-y"></div>
           <div id="radarPoint" class="radar-point"></div>
         </div>
-        <div class="polar-grid">
-          <div class="readout"><span>θ</span><strong id="dialValue">0.00π</strong></div>
+        <div class="main-values">
+          <div class="readout"><span>θ</span><strong id="thetaValue">0.00π</strong></div>
           <div class="readout"><span>Φ</span><strong id="phiValue">0.00π</strong></div>
           <div class="readout"><span>r</span><strong id="radiusValue">0.00</strong></div>
+          <button id="settingsToggle" type="button" aria-controls="torusSettings" aria-expanded="false">Settings</button>
         </div>
       </section>
     </section>
 
   </main>
 
-  <script type="module" src="./app.js?v=theta-slice-1"></script>
+  <script type="module" src="./app.js?v=torus-settings-1"></script>
 </body>
 </html>

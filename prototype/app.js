@@ -1,5 +1,5 @@
 import { AudioProcessor } from './audio/processor.js';
-import { pcdToFrequencyDomain } from './pcd-dft.js';
+import { pcdToFrequencyDomain, frequencyDomainToPcd } from './pcd-dft.js';
 import { TORUS_MAJOR_RADIUS, TORUS_MINOR_RADIUS, toroidalToCartesian } from './torus-coordinates.js?v=torus-settings-1';
 const THREE = window.THREE;
 
@@ -40,6 +40,61 @@ const torusSize = { major: TORUS_MAJOR_RADIUS, minor: TORUS_MINOR_RADIUS };
 const micToggle = document.getElementById('micToggle');
 const micStatus = document.getElementById('micStatus');
 const micIndicator = document.getElementById('micIndicator');
+const pcdSourceToggle = document.getElementById('pcdSourceToggle');
+const pcdStrip = document.getElementById('pcdStrip');
+const pcdStripTitle = document.getElementById('pcdStripTitle');
+const pcdBars = document.getElementById('pcdBars');
+const latestMicPcd = new Float32Array(12);
+const pcdBarEls = [];
+const pcdNameEls = [];
+let showPointerPcd = false;
+const sharpPcdNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+const flatPcdNames = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
+
+for (let i = 0; i < 12; i++) {
+  const column = document.createElement('div');
+  column.className = 'pcd-column';
+  const bar = document.createElement('div');
+  bar.className = 'pcd-bar';
+  const fill = document.createElement('div');
+  fill.className = 'pcd-bar-fill';
+  bar.appendChild(fill);
+  const name = document.createElement('span');
+  name.textContent = sharpPcdNames[i];
+  column.append(bar, name);
+  pcdBars.appendChild(column);
+  pcdBarEls.push(fill);
+  pcdNameEls.push(name);
+}
+function drawPcd(values) {
+  for (let i = 0; i < 12; i++) {
+    const value = Math.max(0, Math.min(1, values[i] || 0));
+    pcdBarEls[i].style.height = (value * 100).toFixed(1) + '%';
+    pcdBarEls[i].parentElement.title = pcdNameEls[i].textContent + ': ' + value.toFixed(3);
+  }
+}
+function updatePointerPcd() {
+  if (!showPointerPcd) return;
+  const amplitudes = [1, 0, 0, Math.min(1, Math.hypot(state.radar.x, state.radar.y)), 0, 1, 0];
+  const phases = [0, 0, 0, Math.atan2(state.radar.y, state.radar.x), 0, state.thetaValue * Math.PI, 0];
+  const reconstructed = frequencyDomainToPcd(amplitudes, phases);
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    reconstructed[i] = Math.max(0, reconstructed[i]);
+    sum += reconstructed[i];
+  }
+  if (sum > 0) for (let i = 0; i < 12; i++) reconstructed[i] /= sum;
+  drawPcd(reconstructed);
+}
+pcdSourceToggle.addEventListener('click', () => {
+  showPointerPcd = !showPointerPcd;
+  pcdSourceToggle.textContent = showPointerPcd ? 'Pointer PCD' : 'Mic PCD';
+  pcdSourceToggle.setAttribute('aria-pressed', String(showPointerPcd));
+  pcdStripTitle.textContent = showPointerPcd ? 'Pointer PCD (approx.)' : 'Mic PCD';
+  if (showPointerPcd) updatePointerPcd();
+  else drawPcd(latestMicPcd);
+});
+drawPcd(latestMicPcd);
 const micSensitivityInput = document.getElementById('micSensitivity');
 const micSensitivityValue = document.getElementById('micSensitivityValue');
 const pcdControls = {
@@ -67,6 +122,7 @@ function updateThetaSlider() {
   updatePointer();
   updateThetaSlice();
   updateRadarNodes();
+  updatePointerPcd();
 }
 
 function updateRadarUi() {
@@ -77,6 +133,7 @@ function updateRadarUi() {
   radarPoint.classList.toggle('active', state.radar.held);
   radarPad.classList.toggle('active', state.radar.held);
   updatePointer();
+  updatePointerPcd();
 
   const px = 50 + state.radar.x * 50;
   const py = 50 - state.radar.y * 50;
@@ -244,6 +301,8 @@ function clearLiveMarker() {
 async function stopMic(message = 'Mic off') {
   clearLiveMarker();
   micRms = 0;
+  latestMicPcd.fill(0);
+  if (!showPointerPcd) drawPcd(latestMicPcd);
   await audioProcessor.stop();
   micIndicator.hidden = true;
   micIndicator.style.opacity = '0.35';
@@ -290,6 +349,10 @@ micToggle.addEventListener('click', async () => {
 audioProcessor.addEventListener('analysis', ({ detail: { pcd, rms, audioTime } }) => {
   micRms = rms;
   updateMicIndicator();
+  if (audioTime !== null && audioTime - lastPcdTime >= 0.05) {
+    latestMicPcd.set(pcd);
+    if (!showPointerPcd) drawPcd(latestMicPcd);
+  }
   if (rms < audioProcessor.config.pcdMinRms || audioTime === null) {
     clearLiveMarker();
     return;
@@ -557,6 +620,9 @@ function applyAccidentalMode() {
     point.labelEl.textContent = label;
     point.radarEl.textContent = label;
   }
+  pcdNameEls.forEach((el, index) => {
+    el.textContent = (useFlats ? flatPcdNames : sharpPcdNames)[index];
+  });
 }
 accidentalModeButton.addEventListener('click', () => {
   useFlats = !useFlats;

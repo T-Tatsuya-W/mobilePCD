@@ -381,8 +381,8 @@ function moveTheta(delta) {
   updateThetaSlider();
 }
 
-// A mouse wheel uses 24 exact positions around θ (π/12 apart); note ticks
-// remain π/6 apart. Small trackpad deltas accumulate into a single step.
+// A mouse wheel uses 48 exact positions around θ (π/24 apart); note ticks
+// remain π/6 apart (four wheel steps). Small trackpad deltas accumulate.
 let wheelPixelRemainder = 0;
 window.addEventListener('wheel', (event) => {
   if (event.ctrlKey || torusSettings.contains(event.target)) return;
@@ -411,10 +411,10 @@ window.addEventListener('wheel', (event) => {
     wheelPixelRemainder -= steps * 60;
   }
   if (!steps) return;
-  const index = Math.round(state.thetaUnwrapped * 12) - steps;
-  state.thetaUnwrapped = index / 12;
+  const index = Math.round(state.thetaUnwrapped * 24) - steps;
+  state.thetaUnwrapped = index / 24;
   // Wrap the integer position before dividing to avoid cumulative wheel drift.
-  state.thetaValue = (((index + 12) % 24 + 24) % 24 - 12) / 12;
+  state.thetaValue = (((index + 24) % 48 + 48) % 48 - 24) / 24;
   updateThetaSlider();
 }, { passive: false });
 

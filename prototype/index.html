@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#111318" />
   <title>mobilePCD Interaction Prototype</title>
-  <link rel="stylesheet" href="./styles.css?v=theta-sixths-1" />
+  <link rel="stylesheet" href="./styles.css?v=prototype-defaults-1" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" href="./icon.svg" type="image/svg+xml" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -32,12 +32,12 @@
           <label for="minorRadius">Minor radius <output id="minorRadiusValue">0.68</output></label>
           <input id="minorRadius" type="range" min="0.15" max="1.00" step="0.01" value="0.68" />
           <label for="plotNotes">Plot notes <input id="plotNotes" type="checkbox" checked /></label>
-          <label for="plotChords">Plot chords <input id="plotChords" type="checkbox" /></label>
+          <label for="plotChords">Plot chords <input id="plotChords" type="checkbox" checked /></label>
           <div class="settings-toggle-row"><span>Note names</span><button id="accidentalMode" type="button" aria-pressed="false">Sharps (♯)</button></div>
           <label for="noteConnections">Note connections <input id="noteConnections" type="checkbox" /></label>
-          <label for="chordConnections">Chord connections <input id="chordConnections" type="checkbox" /></label>
+          <label for="chordConnections">Chord connections <input id="chordConnections" type="checkbox" checked /></label>
           <h2>Theta slider settings</h2>
-          <div class="settings-toggle-row"><span>Marker labels</span><button id="thetaLabelMode" type="button" aria-pressed="false">π fractions</button></div>
+          <div class="settings-toggle-row"><span>Marker labels</span><button id="thetaLabelMode" type="button" aria-pressed="true">Circle of fifths</button></div>
           <h2>Radar settings</h2>
           <label for="radarRange">Radar range <output id="radarRangeValue">0.25π</output></label>
           <input id="radarRange" type="range" min="0.01" max="0.50" step="0.01" value="0.25" />
@@ -64,8 +64,8 @@
           <label for="pcdRefA4">Reference A4 <output id="pcdRefA4Value">440</output> Hz</label>
           <input id="pcdRefA4" type="range" min="430" max="450" step="1" value="440" />
           <h2>Torus to audio settings</h2>
-          <button id="audioToggle" class="mic-toggle" type="button" aria-pressed="false">Start audio</button>
-          <div id="audioStatus" class="mic-status" role="status" aria-live="polite">Audio off</div>
+          <button id="audioToggle" class="mic-toggle" type="button" aria-pressed="true">Stop audio</button>
+          <div id="audioStatus" class="mic-status" role="status" aria-live="polite">Ready · hold radar to play</div>
           <label for="noteThreshold">Note threshold <output id="noteThresholdValue">0.17</output></label>
           <input id="noteThreshold" type="range" min="0" max="0.40" step="0.01" value="0.17" />
           <label for="outputVolume">Output volume <output id="outputVolumeValue">25%</output></label>
@@ -95,6 +95,6 @@
 
   </main>
 
-  <script type="module" src="./app.js?v=theta-sixths-1"></script>
+  <script type="module" src="./app.js?v=prototype-defaults-1"></script>
 </body>
 </html>

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#111318" />
   <title>mobilePCD Interaction Prototype</title>
-  <link rel="stylesheet" href="./styles.css?v=pcd-strip-1" />
+  <link rel="stylesheet" href="./styles.css?v=pointer-pcd-default-1" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" href="./icon.svg" type="image/svg+xml" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -29,7 +29,7 @@
       <section class="torus-window-panel" aria-label="Torus window panel">
         <div id="torusWindow" class="torus-window"></div>
         <span id="micIndicator" class="mic-indicator" role="img" aria-label="Microphone active" hidden></span>
-        <div id="pcdStrip" class="pcd-strip" aria-label="Pitch class distribution"><div id="pcdStripTitle" class="pcd-strip-title">Mic PCD</div><div id="pcdBars" class="pcd-bars"></div></div>
+        <div id="pcdStrip" class="pcd-strip" aria-label="Pitch class distribution"><div id="pcdStripTitle" class="pcd-strip-title">Pointer PCD (approx.)</div><div id="pcdBars" class="pcd-bars"></div></div>
         <div id="torusSettings" class="torus-settings" hidden>
           <h2>Torus geometry and nodes</h2>
           <label for="majorRadius">Major radius <output id="majorRadiusValue">1.55</output></label>
@@ -45,7 +45,7 @@
           <label for="radarRange">Radar range <output id="radarRangeValue">0.25π</output></label>
           <input id="radarRange" type="range" min="0.01" max="0.50" step="0.01" value="0.25" />
           <h2>PCD display</h2>
-          <div class="settings-toggle-row"><span>Show source</span><button id="pcdSourceToggle" type="button" aria-pressed="false">Mic PCD</button></div>
+          <div class="settings-toggle-row"><span>Show source</span><button id="pcdSourceToggle" type="button" aria-pressed="true">Pointer PCD</button></div>
           <h2>Mic to torus settings</h2>
           <button id="micToggle" class="mic-toggle" type="button" aria-pressed="false">Start mic</button>
           <div id="micStatus" class="mic-status" role="status" aria-live="polite">Mic off</div>
@@ -89,6 +89,6 @@
 
   </main>
 
-  <script type="module" src="./app.js?v=pcd-strip-1"></script>
+  <script type="module" src="./app.js?v=pointer-pcd-default-1"></script>
 </body>
 </html>

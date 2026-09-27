@@ -345,3 +345,8 @@ body {
 .pcd-column { display: flex; flex-direction: column; align-items: center; min-width: 0; font-size: clamp(6px, 1.3vw, 9px); line-height: 10px; color: #dce8f7; }
 .pcd-bar { position: relative; flex: 1; width: 100%; min-height: 0; background: rgba(110, 132, 162, .16); border-radius: 2px 2px 0 0; }
 .pcd-bar-fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: #67c9ed; border-radius: 2px 2px 0 0; }
+
+/* Keep the PCD bars visible while the scrollable settings panel is open. */
+.torus-settings { bottom: clamp(59px, calc(18% + 10px), 87px); }
+.pcd-strip { height: clamp(48px, 18%, 76px); background: rgba(12, 17, 24, .94); border-color: rgba(116, 166, 197, .8); }
+.pcd-bar { background: rgba(110, 132, 162, .27); }

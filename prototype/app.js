@@ -42,7 +42,7 @@ const micStatus = document.getElementById('micStatus');
 const micIndicator = document.getElementById('micIndicator');
 const pcdSourceToggle = document.getElementById('pcdSourceToggle');
 const pcdStrip = document.getElementById('pcdStrip');
-const pcdStripTitle = document.getElementById('pcdStripTitle');
+const showPcdInput = document.getElementById('showPcd');
 const pcdBars = document.getElementById('pcdBars');
 const latestMicPcd = new Float32Array(12);
 const pcdBarEls = [];
@@ -77,7 +77,7 @@ function drawPcd(values) {
   }
 }
 function updatePointerPcd() {
-  if (!showPointerPcd) return;
+  if (!showPointerPcd || !showPcdInput.checked) return;
   const amplitudes = [1, 0, 0, Math.min(1, Math.hypot(state.radar.x, state.radar.y)), 0, 1, 0];
   const phases = [0, 0, 0, Math.atan2(state.radar.y, state.radar.x), 0, state.thetaValue * Math.PI, 0];
   const reconstructed = frequencyDomainToPcd(amplitudes, phases);
@@ -93,11 +93,17 @@ pcdSourceToggle.addEventListener('click', () => {
   showPointerPcd = !showPointerPcd;
   pcdSourceToggle.textContent = showPointerPcd ? 'Pointer PCD' : 'Mic PCD';
   pcdSourceToggle.setAttribute('aria-pressed', String(showPointerPcd));
-  pcdStripTitle.textContent = showPointerPcd ? 'Pointer PCD (approx.)' : 'Mic PCD';
+  pcdStrip.classList.toggle('mic-source', !showPointerPcd);
+  pcdStrip.setAttribute('aria-label', showPointerPcd ? 'Pointer pitch class distribution' : 'Microphone pitch class distribution');
   if (showPointerPcd) updatePointerPcd();
-  else {
-    drawPcd(latestMicPcd);
-    pcdStripTitle.textContent = audioProcessor.isRunning() ? 'Mic PCD · analysing…' : 'Mic PCD · mic off';
+  else if (showPcdInput.checked) drawPcd(latestMicPcd);
+});
+showPcdInput.addEventListener('change', () => {
+  pcdStrip.hidden = !showPcdInput.checked;
+  pcdStrip.parentElement.classList.toggle('pcd-hidden', pcdStrip.hidden);
+  if (!pcdStrip.hidden) {
+    if (showPointerPcd) updatePointerPcd();
+    else drawPcd(latestMicPcd);
   }
 });
 updatePointerPcd();
@@ -309,8 +315,7 @@ async function stopMic(message = 'Mic off') {
   micRms = 0;
   latestMicPcd.fill(0);
   if (!showPointerPcd) {
-    drawPcd(latestMicPcd);
-    pcdStripTitle.textContent = 'Mic PCD · mic off';
+    if (showPcdInput.checked) drawPcd(latestMicPcd);
   }
   await audioProcessor.stop();
   micIndicator.hidden = true;
@@ -361,13 +366,11 @@ audioProcessor.addEventListener('analysis', ({ detail: { pcd, rms, audioTime } }
   if (micStatus.textContent.includes('analysing')) micStatus.textContent = 'Mic active';
   if (audioTime !== null && audioTime - lastPcdTime >= 0.05) {
     latestMicPcd.set(pcd);
-    if (!showPointerPcd) {
-      drawPcd(latestMicPcd);
-      const peak = Math.max(...latestMicPcd);
-      pcdStripTitle.textContent = rms < audioProcessor.config.pcdMinRms
-        ? 'Mic PCD · below input level'
-        : peak < 0.0001 ? 'Mic PCD · no pitch bins' : 'Mic PCD';
-    }
+    if (!showPointerPcd && showPcdInput.checked) drawPcd(latestMicPcd);
+    const peak = Math.max(...latestMicPcd);
+    micStatus.textContent = rms < audioProcessor.config.pcdMinRms
+      ? 'Mic active · below input level'
+      : peak < 0.0001 ? 'Mic active · no pitch bins' : 'Mic active';
   }
   if (rms < audioProcessor.config.pcdMinRms || audioTime === null) {
     clearLiveMarker();
@@ -386,7 +389,6 @@ audioProcessor.addEventListener('analysis', ({ detail: { pcd, rms, audioTime } }
 });
 audioProcessor.addEventListener('error', ({ detail: error }) => {
   micStatus.textContent = 'Analysis error: ' + (error?.message || 'unknown');
-  if (!showPointerPcd) pcdStripTitle.textContent = 'Mic PCD · analysis error';
   console.error('Mic analysis failed:', error);
 });
 window.addEventListener('pagehide', () => {

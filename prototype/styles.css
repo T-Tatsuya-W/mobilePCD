@@ -350,3 +350,12 @@ body {
 .torus-settings { bottom: clamp(59px, calc(18% + 10px), 87px); }
 .pcd-strip { height: clamp(48px, 18%, 76px); background: rgba(12, 17, 24, .94); border-color: rgba(116, 166, 197, .8); }
 .pcd-bar { background: rgba(110, 132, 162, .27); }
+
+/* The source colour matches its torus marker; hiding restores settings space. */
+.pcd-strip { border-color: rgba(255, 82, 94, .8); }
+.pcd-bar-fill { background: #ff525e; }
+.pcd-strip.mic-source { border-color: rgba(103, 201, 237, .8); }
+.pcd-strip.mic-source .pcd-bar-fill { background: #67c9ed; }
+.pcd-strip[hidden] { display: none; }
+.torus-window-panel.pcd-hidden .torus-settings { bottom: 10px; }
+.pcd-bars { height: 100%; }

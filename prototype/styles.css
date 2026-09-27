@@ -324,7 +324,6 @@ body {
 .torus-settings { min-height: 0; touch-action: pan-y; scrollbar-gutter: stable; }
 .torus-settings > * { flex-shrink: 0; }
 .torus-settings h2:not(:first-child) { margin-top: 13px; padding-top: 11px; border-top: 1px solid #354357; }
-.torus-settings select { width: 100%; min-height: 36px; padding: 5px 8px; color: #f4f7fb; background: #1b222c; border: 1px solid #475875; border-radius: 8px; font: inherit; }
 .torus-node-label { position: absolute; transform: translate(-50%, -50%); padding: 1px 3px; border-radius: 4px; background: rgba(17, 19, 24, 0.12); color: #f4f7fb; font-size: 10px; line-height: 1.2; text-shadow: 0 1px 3px #000, 0 0 3px #000; white-space: nowrap; }
 .torus-node-label[hidden] { display: none; }
 
@@ -341,29 +340,20 @@ body {
 .mic-indicator { position: absolute; z-index: 6; top: 12px; left: 12px; width: 13px; height: 13px; border-radius: 50%; background: #ff3345; opacity: .35; box-shadow: 0 0 3px #ff3345; pointer-events: none; }
 .mic-indicator[hidden] { display: none; }
 
-.pcd-strip { position: absolute; z-index: 4; left: 5px; right: 5px; bottom: 5px; height: clamp(48px, 18%, 76px); padding: 3px 5px; border: 1px solid rgba(106, 127, 157, .48); border-radius: 8px; background: rgba(12, 17, 24, .78); pointer-events: none; }
-.pcd-strip-title { height: 13px; color: #dce8f7; font-size: 10px; line-height: 12px; }
-.pcd-bars { height: calc(100% - 13px); display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 2px; }
+.pcd-strip { position: absolute; z-index: 4; left: 5px; right: 5px; bottom: 5px; height: clamp(28px, 9%, 42px); padding: 3px 5px; border: 1px solid rgba(255, 82, 94, .8); border-radius: 8px; background: rgba(12, 17, 24, .94); pointer-events: none; }
+.pcd-bars { height: 100%; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 2px; }
 .pcd-column { display: flex; flex-direction: column; align-items: center; min-width: 0; font-size: clamp(6px, 1.3vw, 9px); line-height: 10px; color: #dce8f7; }
-.pcd-bar { position: relative; flex: 1; width: 100%; min-height: 0; background: rgba(110, 132, 162, .16); border-radius: 2px 2px 0 0; }
-.pcd-bar-fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: #67c9ed; border-radius: 2px 2px 0 0; }
-
-/* Keep the PCD bars visible while the scrollable settings panel is open. */
-.torus-settings { bottom: clamp(59px, calc(18% + 10px), 87px); }
-.pcd-strip { height: clamp(48px, 18%, 76px); background: rgba(12, 17, 24, .94); border-color: rgba(116, 166, 197, .8); }
-.pcd-bar { background: rgba(110, 132, 162, .27); }
+.pcd-bar { position: relative; flex: 1; width: 100%; min-height: 0; background: rgba(110, 132, 162, .27); border-radius: 2px 2px 0 0; }
+.pcd-bar-fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0; border-radius: 2px 2px 0 0; }
 
 /* The source colour matches its torus marker; hiding restores settings space. */
-.pcd-strip { border-color: rgba(255, 82, 94, .8); }
 .pcd-bar-fill { background: #ff525e; }
 .pcd-strip.mic-source { border-color: rgba(103, 201, 237, .8); }
 .pcd-strip.mic-source .pcd-bar-fill { background: #67c9ed; }
 .pcd-strip[hidden] { display: none; }
 .torus-window-panel.pcd-hidden .torus-settings { bottom: 10px; }
-.pcd-bars { height: 100%; }
 
 /* Compact bars leave more of the torus unobscured. */
-.pcd-strip { height: clamp(28px, 9%, 42px); }
 .torus-settings { bottom: clamp(39px, calc(9% + 10px), 53px); }
 .audio-octave-heading { font-size: .8rem; color: #dce8f7; }
 .audio-octaves { display: flex; justify-content: space-between; gap: 4px; }

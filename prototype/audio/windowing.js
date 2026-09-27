@@ -19,10 +19,3 @@ export function hannWindow(size) {
   return window;
 }
 
-/**
- * Clears all cached window functions. Useful when freeing memory
- * or when running in constrained environments.
- */
-export function clearWindowCache() {
-  windowCache.clear();
-}

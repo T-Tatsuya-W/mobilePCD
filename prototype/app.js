@@ -1,4 +1,4 @@
-import { AudioProcessor } from './audio/processor.js';
+import { AudioProcessor } from './audio/processor.js?v=prototype-clean-1';
 import { TorusAudioOutput } from './audio/torus-output.js';
 import { pcdToFrequencyDomain } from './pcd-dft.js';
 import { TORUS_MAJOR_RADIUS, TORUS_MINOR_RADIUS, toroidalToCartesian } from './torus-coordinates.js?v=torus-settings-1';
@@ -501,7 +501,6 @@ document.addEventListener('visibilitychange', () => {
 const audioProcessor = new AudioProcessor({
   windowSize: 8192,
   hopSize: 2048,
-  tuner: { enabled: false },
 });
 let micPending = false;
 let micPageHidden = false;

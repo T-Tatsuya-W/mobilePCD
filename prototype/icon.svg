@@ -1,1 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="100" fill="#111318"/><ellipse cx="256" cy="256" rx="156" ry="104" fill="none" stroke="#738cff" stroke-width="44"/><circle cx="344" cy="190" r="26" fill="#9affc9"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Torus with chord connections and a red pointer">
+  <defs>
+    <radialGradient id="background" cx="50%" cy="42%" r="68%">
+      <stop stop-color="#202838"/>
+      <stop offset="1" stop-color="#111318"/>
+    </radialGradient>
+    <linearGradient id="torus" x1="0" y1="0" x2="0.9" y2="1">
+      <stop stop-color="#637bdf"/>
+      <stop offset="0.53" stop-color="#374989"/>
+      <stop offset="1" stop-color="#243257"/>
+    </linearGradient>
+    <radialGradient id="pointer">
+      <stop stop-color="#ffaaa2"/>
+      <stop offset="0.6" stop-color="#ff5361"/>
+      <stop offset="1" stop-color="#df293e"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="110" fill="url(#background)"/>
+  <ellipse cx="256" cy="256" rx="176" ry="149" fill="url(#torus)"/>
+  <ellipse cx="256" cy="256" rx="176" ry="149" fill="none" stroke="#9bb1ff" stroke-width="8"/>
+  <ellipse cx="256" cy="256" rx="99" ry="76" fill="#151b27" stroke="#8baaff" stroke-width="7"/>
+  <path d="M165 256 211 207 301 207 347 256 301 305 211 305Z" fill="none" stroke="#92d3ee" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M165 256 301 207M211 207 347 256M301 207 211 305M347 256 211 305M301 305 165 256M211 207 301 305" fill="none" stroke="#87b9e1" stroke-width="4" opacity=".65"/>
+  <g fill="#bce9f6">
+    <circle cx="165" cy="256" r="5"/><circle cx="211" cy="207" r="5"/>
+    <circle cx="301" cy="207" r="5"/><circle cx="347" cy="256" r="5"/>
+    <circle cx="301" cy="305" r="5"/><circle cx="211" cy="305" r="5"/>
+  </g>
+  <circle cx="375" cy="319" r="29" fill="#ff525e" opacity=".18"/>
+  <circle cx="375" cy="319" r="17" fill="url(#pointer)" stroke="#ffd2ce" stroke-width="3"/>
+</svg>

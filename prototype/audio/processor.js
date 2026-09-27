@@ -1,7 +1,6 @@
 import { hannWindow } from './windowing.js';
 import { RealFFT } from './fft.js';
 import { PitchClassComputer } from './pcd.js';
-import { estimatePrimary } from './primary-detection.js';
 
 const WORKLET_SOURCE = `
   class Tap extends AudioWorkletProcessor {
@@ -55,15 +54,6 @@ export const DEFAULT_AUDIO_CONFIG = {
   refA4: 440,
 };
 
-export const DEFAULT_TUNER_CONFIG = {
-  enabled: true,
-  minHz: 70,
-  maxHz: 1800,
-  minProminence: 6.0,
-  minRMS: 0.003,
-  reactivity: 0.35,
-};
-
 /**
  * AudioProcessor encapsulates microphone capture, FFT analysis and pitch class
  * computation. It dispatches `analysis` events with the current frame data so
@@ -74,9 +64,7 @@ export class AudioProcessor extends EventTarget {
   constructor(config = {}) {
     super();
 
-    const { tuner, ...audioConfig } = config;
-    this.config = { ...DEFAULT_AUDIO_CONFIG, ...audioConfig };
-    this.tunerConfig = { ...DEFAULT_TUNER_CONFIG, ...(tuner || {}) };
+    this.config = { ...DEFAULT_AUDIO_CONFIG, ...config };
 
     this.audioContext = null;
     this.mediaStreamSource = null;
@@ -171,11 +159,6 @@ export class AudioProcessor extends EventTarget {
     }
 
     cfg.hopSize = Math.min(cfg.hopSize, cfg.windowSize);
-  }
-
-  updateTuner(updates = {}) {
-    if (typeof updates !== 'object') return;
-    Object.assign(this.tunerConfig, updates);
   }
 
   async start() {
@@ -305,31 +288,11 @@ export class AudioProcessor extends EventTarget {
         this.currentPcd[i] = smoothing * this.currentPcd[i] + beta * this.rawPcd[i];
       }
 
-      let primary = null;
-      if (this.tunerConfig.enabled && rms >= this.tunerConfig.minRMS) {
-        const est = estimatePrimary(magnitudes, this.sampleRate, this.tunerConfig.minHz, this.tunerConfig.maxHz);
-        if (est && est.prominenceDb >= this.tunerConfig.minProminence) {
-          const midiReal = 69 + 12 * Math.log2(est.freq / this.config.refA4);
-          const nearest = Math.round(midiReal);
-          const cents = (midiReal - nearest) * 100;
-          const pitchClass = ((nearest % 12) + 12) % 12;
-          primary = {
-            freq: est.freq,
-            prominenceDb: est.prominenceDb,
-            cents,
-            pitchClass,
-            nearestMidi: nearest,
-            midi: midiReal,
-          };
-        }
-      }
-
       const detail = {
         pcd: this.currentPcd,
         rawPcd: this.rawPcd,
         rms,
         magnitudes,
-        primary,
         sampleRate: this.sampleRate,
         audioTime: this.audioContext ? this.audioContext.currentTime : null,
       };

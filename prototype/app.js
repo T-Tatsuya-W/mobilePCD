@@ -58,13 +58,14 @@ const outputVolumeInput = document.getElementById('outputVolume');
 const outputVolumeValue = document.getElementById('outputVolumeValue');
 const octaveInputs = Array.from(document.querySelectorAll('.audio-octave'));
 let audioPending = false;
+let audioEnabled = true;
 let showPointerPcd = true;
 const sharpPcdNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
 const flatPcdNames = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
 
 const thetaTrack = thetaSliderPanel.querySelector('.theta-slider-track');
 const thetaLabelModeButton = document.getElementById('thetaLabelMode');
-let showThetaNotes = false;
+let showThetaNotes = true;
 const thetaTickLabels = [];
 // The phase-5 circle advances one perfect fifth per π/6: C, G, D ... F♯.
 const thetaFractions = ['0', 'π/6', 'π/3', 'π/2', '2π/3', '5π/6', 'π'];
@@ -152,34 +153,47 @@ outputVolumeInput.addEventListener('input', updateAudioSettings);
 octaveInputs.forEach(input => input.addEventListener('change', updateAudioSettings));
 updateAudioSettings();
 
-audioToggle.addEventListener('click', async () => {
-  if (audioPending) return;
+// Audio is enabled by default, but browsers require a user gesture before Web Audio starts.
+// The first radar press unlocks output and also begins playing that press's pointer PCD.
+async function startAudio() {
+  if (!audioEnabled || audioPending || audioOutput.isRunning()) return;
+  if (!octaveInputs.some(input => input.checked)) {
+    audioStatus.textContent = 'Select at least one octave';
+    return;
+  }
   audioPending = true;
   audioToggle.disabled = true;
   try {
-    if (audioOutput.isRunning()) {
-      await audioOutput.stop();
-      audioToggle.textContent = 'Start audio';
-      audioToggle.setAttribute('aria-pressed', 'false');
-      audioStatus.textContent = 'Audio off';
-    } else {
-      if (!octaveInputs.some(input => input.checked)) {
-        audioStatus.textContent = 'Select at least one octave';
-        return;
-      }
-      await audioOutput.start();
-      audioOutput.update(pointerPcd);
-      audioOutput.setHeld(state.radar.held);
-      audioToggle.textContent = 'Stop audio';
-      audioToggle.setAttribute('aria-pressed', 'true');
-      audioStatus.textContent = state.radar.held ? 'Playing pointer PCD' : 'Ready · hold radar to play';
-    }
+    await audioOutput.start();
+    audioOutput.update(pointerPcd);
+    audioOutput.setHeld(state.radar.held);
+    audioStatus.textContent = state.radar.held ? 'Playing pointer PCD' : 'Ready · hold radar to play';
   } catch (error) {
     await audioOutput.stop();
     audioStatus.textContent = 'Audio unavailable: ' + (error.name || 'error');
   } finally {
     audioPending = false;
     audioToggle.disabled = false;
+  }
+}
+
+audioToggle.addEventListener('click', async () => {
+  if (audioPending) return;
+  audioEnabled = !audioEnabled;
+  audioToggle.textContent = audioEnabled ? 'Stop audio' : 'Start audio';
+  audioToggle.setAttribute('aria-pressed', String(audioEnabled));
+  if (audioEnabled) {
+    await startAudio();
+  } else {
+    audioStatus.textContent = 'Audio off';
+    audioPending = true;
+    audioToggle.disabled = true;
+    try {
+      await audioOutput.stop();
+    } finally {
+      audioPending = false;
+      audioToggle.disabled = false;
+    }
   }
 });
 pcdSourceToggle.addEventListener('click', () => {
@@ -334,6 +348,7 @@ radarPad.addEventListener('pointerdown', (event) => {
   radarPad.setPointerCapture(event.pointerId);
   setRadarFromEvent(event);
   updateRadarUi();
+  void startAudio();
 });
 
 radarPad.addEventListener('pointermove', (event) => {

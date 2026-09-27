@@ -52,8 +52,12 @@ const pointerPcd = new Float32Array(12);
 const audioOutput = new TorusAudioOutput();
 const audioToggle = document.getElementById('audioToggle');
 const audioStatus = document.getElementById('audioStatus');
-const noteThresholdInput = document.getElementById('noteThreshold');
+const noteThresholdMinInput = document.getElementById('noteThresholdMin');
+const noteThresholdMaxInput = document.getElementById('noteThresholdMax');
+const noteThresholdMinValue = document.getElementById('noteThresholdMinValue');
+const noteThresholdMaxValue = document.getElementById('noteThresholdMaxValue');
 const noteThresholdValue = document.getElementById('noteThresholdValue');
+let currentNoteThreshold = Number(noteThresholdMinInput.value);
 const outputVolumeInput = document.getElementById('outputVolume');
 const outputVolumeValue = document.getElementById('outputVolumeValue');
 const octaveInputs = Array.from(document.querySelectorAll('.audio-octave'));
@@ -117,7 +121,7 @@ function drawPcd(values) {
     const value = Math.max(0, Math.min(1, values[i] || 0));
     // Normalise bar height to the strongest bin so spread-out audio remains legible.
     pcdBarEls[i].style.height = peak > 0 ? (value / peak * 100).toFixed(1) + '%' : '0%';
-    const aboveThreshold = showPointerPcd && value >= Number(noteThresholdInput.value) && value > 0;
+    const aboveThreshold = showPointerPcd && value >= currentNoteThreshold && value > 0;
     pcdBarEls[i].parentElement.parentElement.classList.toggle('active-note', aboveThreshold);
     pcdBarEls[i].parentElement.title = pcdNameEls[i].textContent + ': ' + value.toFixed(3) +
       (aboveThreshold ? ' · above note threshold' : '');
@@ -140,15 +144,36 @@ function updatePointerPcd() {
   audioOutput.update(pointerPcd);
   if (showPointerPcd && showPcdInput.checked) drawPcd(pointerPcd);
 }
+function updateNoteThreshold() {
+  const min = Number(noteThresholdMinInput.value);
+  const max = Number(noteThresholdMaxInput.value);
+  const radius = Math.min(1, Math.hypot(state.radar.x, state.radar.y));
+  currentNoteThreshold = min + (max - min) * radius;
+  audioOutput.setThreshold(currentNoteThreshold);
+  noteThresholdMinValue.textContent = min.toFixed(2);
+  noteThresholdMaxValue.textContent = max.toFixed(2);
+  noteThresholdValue.textContent = currentNoteThreshold.toFixed(2);
+}
 function updateAudioSettings() {
-  audioOutput.setThreshold(Number(noteThresholdInput.value));
+  updateNoteThreshold();
   audioOutput.setVolume(Number(outputVolumeInput.value));
   audioOutput.setOctaves(octaveInputs.filter(input => input.checked).map(input => Number(input.value)));
-  noteThresholdValue.textContent = Number(noteThresholdInput.value).toFixed(2);
   if (showPointerPcd && showPcdInput.checked) drawPcd(pointerPcd);
   outputVolumeValue.textContent = Math.round(Number(outputVolumeInput.value) * 100) + '%';
 }
-noteThresholdInput.addEventListener('input', updateAudioSettings);
+noteThresholdMinInput.addEventListener('input', () => {
+  // The threshold at the centre must never exceed the threshold at the edge.
+  if (Number(noteThresholdMinInput.value) > Number(noteThresholdMaxInput.value)) {
+    noteThresholdMaxInput.value = noteThresholdMinInput.value;
+  }
+  updateAudioSettings();
+});
+noteThresholdMaxInput.addEventListener('input', () => {
+  if (Number(noteThresholdMaxInput.value) < Number(noteThresholdMinInput.value)) {
+    noteThresholdMinInput.value = noteThresholdMaxInput.value;
+  }
+  updateAudioSettings();
+});
 outputVolumeInput.addEventListener('input', updateAudioSettings);
 octaveInputs.forEach(input => input.addEventListener('change', updateAudioSettings));
 updateAudioSettings();
@@ -252,6 +277,7 @@ function updateRadarUi() {
   radarPoint.classList.toggle('active', state.radar.held);
   radarPad.classList.toggle('active', state.radar.held);
   updatePointer();
+  updateNoteThreshold();
   updatePointerPcd();
   audioOutput.setHeld(state.radar.held);
   if (audioOutput.isRunning()) audioStatus.textContent = state.radar.held

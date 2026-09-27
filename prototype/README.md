@@ -8,5 +8,5 @@ Standalone mobilePCD control and torus experiment. Serve the repository over HTT
 - The renderer and all of its data and transformation code live inside `prototype/`. The root `json/notes.json` is populated in the same schema as `json/chords.json` for the existing app.
 - The Settings button overlays fixed-range major and minor radius sliders on the torus window. Their changes update the mesh, all plotted nodes, the red θ slice and the pointer; torus geometry is disposed when replaced.
 - A single reusable red marker follows θ, Φ and r from the controls. It dims when the radar is released; dragging the view only changes the camera pose of the same marker.
-- The settings overlay scrolls and offers Notes, Chords or Both; plotted nodes use phase 5 (θ) for hue, and translucent labels sit above their markers. Empty Mic to torus and Torus to audio sections reserve room for future controls.
+- The settings overlay scrolls and offers Notes, Chords or Both; plotted nodes use phase 5 (θ) for hue, and translucent labels are centered on their markers; chord labels abbreviate Major/minor as M/m. Empty Mic to torus and Torus to audio sections reserve room for future controls.
 - The prototype does not yet connect live microphone PCD to the plotted note positions.

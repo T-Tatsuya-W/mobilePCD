@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#111318" />
   <title>mobilePCD Interaction Prototype</title>
-  <link rel="stylesheet" href="./styles.css?v=spin-infinity-1" />
+  <link rel="stylesheet" href="./styles.css?v=centered-spin-1" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" href="./icon.svg" type="image/svg+xml" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -32,11 +32,11 @@
           <label for="minorRadius">Minor radius <output id="minorRadiusValue">0.68</output></label>
           <input id="minorRadius" type="range" min="0.15" max="1.00" step="0.01" value="0.68" />
           <h2>View rotation</h2>
-          <label for="spinSpeed">Spin speed <output id="spinSpeedValue">0.00π/s</output></label>
-          <input id="spinSpeed" type="range" min="0" max="2" step="0.05" value="0" />
+          <label for="spinSpeed">Spin speed <output id="spinSpeedValue">0.000π/s</output></label>
+          <input id="spinSpeed" type="range" min="0" max="0.5" step="0.005" value="0" />
           <label for="spinRange">Spin range <output id="spinRangeValue">∞</output></label>
           <input id="spinRange" type="range" min="0" max="2.05" step="0.05" value="2.05" />
-          <div class="mic-status">Range 0 holds still; 2π makes a full turn before reversing; ∞ spins continuously.</div>
+          <div class="mic-status">Range 0 holds still; the selected angle is the total sweep, centred on your current view. ∞ spins continuously.</div>
           <div class="settings-toggle-row"><span>Spin direction</span><button id="spinDirection" type="button" aria-pressed="false">Forward ↻</button></div>
           <label for="plotNotes">Plot notes <input id="plotNotes" type="checkbox" checked /></label>
           <label for="plotChords">Plot chords <input id="plotChords" type="checkbox" checked /></label>
@@ -108,6 +108,6 @@
 
   </main>
 
-  <script type="module" src="./app.js?v=spin-infinity-1"></script>
+  <script type="module" src="./app.js?v=centered-spin-1"></script>
 </body>
 </html>

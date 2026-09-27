@@ -7,7 +7,7 @@ export class TorusAudioOutput {
     this.voices = new Map();
     this.pcd = new Float32Array(12);
     this.octaves = [4];
-    this.threshold = 0.16;
+    this.threshold = 0.17;
     this.volume = 0.25;
     this.held = false;
   }

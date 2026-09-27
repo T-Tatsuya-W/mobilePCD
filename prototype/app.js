@@ -1,3 +1,4 @@
+import { TORUS_MAJOR_RADIUS, TORUS_MINOR_RADIUS, toroidalToCartesian } from './torus-coordinates.js';
 const THREE = window.THREE;
 
 const state = {
@@ -202,7 +203,7 @@ container.addEventListener('pointercancel', endView);
 container.addEventListener('lostpointercapture', endView);
 
 const torus = new THREE.Mesh(
-  new THREE.TorusGeometry(1.55, 0.68, 30, 90),
+  new THREE.TorusGeometry(TORUS_MAJOR_RADIUS, TORUS_MINOR_RADIUS, 30, 90),
   new THREE.MeshBasicMaterial({
     color: 0x738cff,
     transparent: true,
@@ -215,32 +216,8 @@ group.add(torus);
 
 const pointMaterial = new THREE.MeshBasicMaterial({ color: 0xf4f7fb });
 const pointGeometry = new THREE.SphereGeometry(0.07, 18, 14);
-
-const testPoints = [
-  { label: 'A', pos: new THREE.Vector3(1.58, 0.18, 0.04) },
-  { label: 'C', pos: new THREE.Vector3(-0.55, 1.15, 0.70) },
-  { label: 'E', pos: new THREE.Vector3(-1.15, -0.62, -0.52) },
-  { label: 'G', pos: new THREE.Vector3(0.28, -1.20, 0.92) },
-];
-
-for (const item of testPoints) {
-  const marker = new THREE.Mesh(pointGeometry, pointMaterial);
-  marker.position.copy(item.pos);
-  marker.userData.label = item.label;
-  group.add(marker);
-}
-
-const lineGeometry = new THREE.BufferGeometry().setFromPoints([
-  testPoints[0].pos, testPoints[1].pos,
-  testPoints[1].pos, testPoints[2].pos,
-  testPoints[2].pos, testPoints[3].pos,
-  testPoints[3].pos, testPoints[0].pos,
-]);
-const lines = new THREE.LineSegments(
-  lineGeometry,
-  new THREE.LineBasicMaterial({ color: 0x9affc9, transparent: true, opacity: 0.55 })
-);
-group.add(lines);
+const notePoints = [];
+const labelEls = [];
 
 const labelLayer = document.createElement('div');
 labelLayer.className = 'label-layer';
@@ -251,23 +228,40 @@ Object.assign(labelLayer.style, {
 });
 container.appendChild(labelLayer);
 
-const labelEls = testPoints.map((item) => {
-  const el = document.createElement('div');
-  el.textContent = item.label;
-  Object.assign(el.style, {
-    position: 'absolute',
-    transform: 'translate(-50%, -50%)',
-    padding: '2px 5px',
-    borderRadius: '999px',
-    background: 'rgba(17,19,24,0.78)',
-    border: '1px solid rgba(244,247,251,0.25)',
-    fontSize: '11px',
-    color: '#f4f7fb',
-    whiteSpace: 'nowrap',
+async function loadNotePoints() {
+  const response = await fetch('./json/notes.json');
+  if (!response.ok) throw new Error('Could not load notes.json: ' + response.status);
+  const { Mag3, Pha3, Pha5, Labels } = await response.json();
+  if (![Mag3, Pha3, Pha5, Labels].every(values => Array.isArray(values) && values.length === 12)) {
+    throw new Error('Expected twelve values in each notes.json array');
+  }
+
+  Labels.forEach((label, index) => {
+    const point = toroidalToCartesian(Pha5[index], Pha3[index], Mag3[index]);
+    const pos = new THREE.Vector3(point.x, point.y, point.z);
+    const marker = new THREE.Mesh(pointGeometry, pointMaterial);
+    marker.position.copy(pos);
+    group.add(marker);
+    notePoints.push({ label, pos });
+
+    const el = document.createElement('div');
+    el.textContent = label;
+    Object.assign(el.style, {
+      position: 'absolute',
+      transform: 'translate(-50%, -50%)',
+      padding: '2px 5px',
+      borderRadius: '999px',
+      background: 'rgba(17,19,24,0.78)',
+      border: '1px solid rgba(244,247,251,0.25)',
+      fontSize: '11px',
+      color: '#f4f7fb',
+      whiteSpace: 'nowrap',
+    });
+    labelLayer.appendChild(el);
+    labelEls.push(el);
   });
-  labelLayer.appendChild(el);
-  return el;
-});
+}
+loadNotePoints().catch(error => console.error('Note plotting failed:', error));
 
 function resizeThree() {
   const rect = container.getBoundingClientRect();
@@ -280,7 +274,7 @@ function resizeThree() {
 
 function updateLabels() {
   const rect = container.getBoundingClientRect();
-  testPoints.forEach((item, index) => {
+  notePoints.forEach((item, index) => {
     const world = item.pos.clone();
     group.localToWorld(world);
     world.project(camera);

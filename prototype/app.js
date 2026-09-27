@@ -52,19 +52,24 @@ const pointerPcd = new Float32Array(12);
 const audioOutput = new TorusAudioOutput();
 const audioToggle = document.getElementById('audioToggle');
 const audioStatus = document.getElementById('audioStatus');
-const noteThresholdInput = document.getElementById('noteThreshold');
+const noteThresholdMinInput = document.getElementById('noteThresholdMin');
+const noteThresholdMaxInput = document.getElementById('noteThresholdMax');
+const noteThresholdMinValue = document.getElementById('noteThresholdMinValue');
+const noteThresholdMaxValue = document.getElementById('noteThresholdMaxValue');
 const noteThresholdValue = document.getElementById('noteThresholdValue');
+let currentNoteThreshold = Number(noteThresholdMinInput.value);
 const outputVolumeInput = document.getElementById('outputVolume');
 const outputVolumeValue = document.getElementById('outputVolumeValue');
 const octaveInputs = Array.from(document.querySelectorAll('.audio-octave'));
 let audioPending = false;
+let audioEnabled = true;
 let showPointerPcd = true;
 const sharpPcdNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
 const flatPcdNames = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
 
 const thetaTrack = thetaSliderPanel.querySelector('.theta-slider-track');
 const thetaLabelModeButton = document.getElementById('thetaLabelMode');
-let showThetaNotes = false;
+let showThetaNotes = true;
 const thetaTickLabels = [];
 // The phase-5 circle advances one perfect fifth per π/6: C, G, D ... F♯.
 const thetaFractions = ['0', 'π/6', 'π/3', 'π/2', '2π/3', '5π/6', 'π'];
@@ -116,7 +121,7 @@ function drawPcd(values) {
     const value = Math.max(0, Math.min(1, values[i] || 0));
     // Normalise bar height to the strongest bin so spread-out audio remains legible.
     pcdBarEls[i].style.height = peak > 0 ? (value / peak * 100).toFixed(1) + '%' : '0%';
-    const aboveThreshold = showPointerPcd && value >= Number(noteThresholdInput.value) && value > 0;
+    const aboveThreshold = showPointerPcd && value >= currentNoteThreshold && value > 0;
     pcdBarEls[i].parentElement.parentElement.classList.toggle('active-note', aboveThreshold);
     pcdBarEls[i].parentElement.title = pcdNameEls[i].textContent + ': ' + value.toFixed(3) +
       (aboveThreshold ? ' · above note threshold' : '');
@@ -139,47 +144,81 @@ function updatePointerPcd() {
   audioOutput.update(pointerPcd);
   if (showPointerPcd && showPcdInput.checked) drawPcd(pointerPcd);
 }
+function updateNoteThreshold() {
+  const min = Number(noteThresholdMinInput.value);
+  const max = Number(noteThresholdMaxInput.value);
+  const radius = Math.min(1, Math.hypot(state.radar.x, state.radar.y));
+  currentNoteThreshold = min + (max - min) * radius;
+  audioOutput.setThreshold(currentNoteThreshold);
+  noteThresholdMinValue.textContent = min.toFixed(2);
+  noteThresholdMaxValue.textContent = max.toFixed(2);
+  noteThresholdValue.textContent = currentNoteThreshold.toFixed(2);
+}
 function updateAudioSettings() {
-  audioOutput.setThreshold(Number(noteThresholdInput.value));
+  updateNoteThreshold();
   audioOutput.setVolume(Number(outputVolumeInput.value));
   audioOutput.setOctaves(octaveInputs.filter(input => input.checked).map(input => Number(input.value)));
-  noteThresholdValue.textContent = Number(noteThresholdInput.value).toFixed(2);
   if (showPointerPcd && showPcdInput.checked) drawPcd(pointerPcd);
   outputVolumeValue.textContent = Math.round(Number(outputVolumeInput.value) * 100) + '%';
 }
-noteThresholdInput.addEventListener('input', updateAudioSettings);
+noteThresholdMinInput.addEventListener('input', () => {
+  // The threshold at the centre must never exceed the threshold at the edge.
+  if (Number(noteThresholdMinInput.value) > Number(noteThresholdMaxInput.value)) {
+    noteThresholdMaxInput.value = noteThresholdMinInput.value;
+  }
+  updateAudioSettings();
+});
+noteThresholdMaxInput.addEventListener('input', () => {
+  if (Number(noteThresholdMaxInput.value) < Number(noteThresholdMinInput.value)) {
+    noteThresholdMinInput.value = noteThresholdMaxInput.value;
+  }
+  updateAudioSettings();
+});
 outputVolumeInput.addEventListener('input', updateAudioSettings);
 octaveInputs.forEach(input => input.addEventListener('change', updateAudioSettings));
 updateAudioSettings();
 
-audioToggle.addEventListener('click', async () => {
-  if (audioPending) return;
+// Audio is enabled by default, but browsers require a user gesture before Web Audio starts.
+// The first radar press unlocks output and also begins playing that press's pointer PCD.
+async function startAudio() {
+  if (!audioEnabled || audioPending || audioOutput.isRunning()) return;
+  if (!octaveInputs.some(input => input.checked)) {
+    audioStatus.textContent = 'Select at least one octave';
+    return;
+  }
   audioPending = true;
   audioToggle.disabled = true;
   try {
-    if (audioOutput.isRunning()) {
-      await audioOutput.stop();
-      audioToggle.textContent = 'Start audio';
-      audioToggle.setAttribute('aria-pressed', 'false');
-      audioStatus.textContent = 'Audio off';
-    } else {
-      if (!octaveInputs.some(input => input.checked)) {
-        audioStatus.textContent = 'Select at least one octave';
-        return;
-      }
-      await audioOutput.start();
-      audioOutput.update(pointerPcd);
-      audioOutput.setHeld(state.radar.held);
-      audioToggle.textContent = 'Stop audio';
-      audioToggle.setAttribute('aria-pressed', 'true');
-      audioStatus.textContent = state.radar.held ? 'Playing pointer PCD' : 'Ready · hold radar to play';
-    }
+    await audioOutput.start();
+    audioOutput.update(pointerPcd);
+    audioOutput.setHeld(state.radar.held);
+    audioStatus.textContent = state.radar.held ? 'Playing pointer PCD' : 'Ready · hold radar to play';
   } catch (error) {
     await audioOutput.stop();
     audioStatus.textContent = 'Audio unavailable: ' + (error.name || 'error');
   } finally {
     audioPending = false;
     audioToggle.disabled = false;
+  }
+}
+
+audioToggle.addEventListener('click', async () => {
+  if (audioPending) return;
+  audioEnabled = !audioEnabled;
+  audioToggle.textContent = audioEnabled ? 'Stop audio' : 'Start audio';
+  audioToggle.setAttribute('aria-pressed', String(audioEnabled));
+  if (audioEnabled) {
+    await startAudio();
+  } else {
+    audioStatus.textContent = 'Audio off';
+    audioPending = true;
+    audioToggle.disabled = true;
+    try {
+      await audioOutput.stop();
+    } finally {
+      audioPending = false;
+      audioToggle.disabled = false;
+    }
   }
 });
 pcdSourceToggle.addEventListener('click', () => {
@@ -238,6 +277,7 @@ function updateRadarUi() {
   radarPoint.classList.toggle('active', state.radar.held);
   radarPad.classList.toggle('active', state.radar.held);
   updatePointer();
+  updateNoteThreshold();
   updatePointerPcd();
   audioOutput.setHeld(state.radar.held);
   if (audioOutput.isRunning()) audioStatus.textContent = state.radar.held
@@ -334,6 +374,7 @@ radarPad.addEventListener('pointerdown', (event) => {
   radarPad.setPointerCapture(event.pointerId);
   setRadarFromEvent(event);
   updateRadarUi();
+  void startAudio();
 });
 
 radarPad.addEventListener('pointermove', (event) => {

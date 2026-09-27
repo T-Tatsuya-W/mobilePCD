@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#111318" />
   <title>mobilePCD Interaction Prototype</title>
-  <link rel="stylesheet" href="./styles.css?v=torus-settings-1" />
+  <link rel="stylesheet" href="./styles.css?v=node-plot-1" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" href="./icon.svg" type="image/svg+xml" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -29,11 +29,15 @@
       <section class="torus-window-panel" aria-label="Torus window panel">
         <div id="torusWindow" class="torus-window"></div>
         <div id="torusSettings" class="torus-settings" hidden>
-          <h2>Torus proportions</h2>
+          <h2>Torus geometry and nodes</h2>
           <label for="majorRadius">Major radius <output id="majorRadiusValue">1.55</output></label>
           <input id="majorRadius" type="range" min="0.90" max="2.20" step="0.01" value="1.55" />
           <label for="minorRadius">Minor radius <output id="minorRadiusValue">0.68</output></label>
           <input id="minorRadius" type="range" min="0.15" max="1.00" step="0.01" value="0.68" />
+          <label for="plotMode">Plot nodes</label>
+          <select id="plotMode"><option value="notes">Notes</option><option value="chords">Chords</option><option value="both">Both</option></select>
+          <h2>Mic to torus settings</h2>
+          <h2>Torus to audio settings</h2>
         </div>
       </section>
 
@@ -57,6 +61,6 @@
 
   </main>
 
-  <script type="module" src="./app.js?v=torus-settings-1"></script>
+  <script type="module" src="./app.js?v=node-plot-1"></script>
 </body>
 </html>

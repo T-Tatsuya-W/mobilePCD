@@ -24,6 +24,7 @@ const majorRadiusInput = document.getElementById('majorRadius');
 const minorRadiusInput = document.getElementById('minorRadius');
 const majorRadiusValue = document.getElementById('majorRadiusValue');
 const minorRadiusValue = document.getElementById('minorRadiusValue');
+const plotModeInput = document.getElementById('plotMode');
 const torusSize = { major: TORUS_MAJOR_RADIUS, minor: TORUS_MINOR_RADIUS };
 
 function updateThetaSlider() {
@@ -273,10 +274,8 @@ function updatePointer() {
   pointerMaterial.opacity = state.radar.held ? 1 : 0.55;
 }
 
-const pointMaterial = new THREE.MeshBasicMaterial({ color: 0xf4f7fb });
-const pointGeometry = new THREE.SphereGeometry(0.07, 18, 14);
-const notePoints = [];
-const labelEls = [];
+const pointGeometry = new THREE.SphereGeometry(0.09, 18, 14);
+const plottedPoints = [];
 
 const labelLayer = document.createElement('div');
 labelLayer.className = 'label-layer';
@@ -287,41 +286,49 @@ Object.assign(labelLayer.style, {
 });
 torusWindow.appendChild(labelLayer);
 
-async function loadNotePoints() {
-  const response = await fetch('./json/notes.json', { cache: 'no-store' });
-  if (!response.ok) throw new Error('Could not load notes.json: ' + response.status);
-  const { Mag3, Pha3, Pha5, Labels } = await response.json();
-  if (![Mag3, Pha3, Pha5, Labels].every(values => Array.isArray(values) && values.length === 12)) {
-    throw new Error('Expected twelve values in each notes.json array');
+function applyPlotMode() {
+  for (const point of plottedPoints) {
+    const visible = plotModeInput.value === 'both' || plotModeInput.value === point.kind;
+    point.marker.visible = visible;
+    point.labelEl.hidden = !visible;
   }
+}
+plotModeInput.addEventListener('change', applyPlotMode);
 
-  console.info('Loaded ' + Labels.length + ' chromatic note nodes');
-  Labels.forEach((label, index) => {
-    const point = toroidalToCartesian(
-      Pha5[index], Pha3[index], Mag3[index], {}, torusSize.major, torusSize.minor
-    );
-    const pos = new THREE.Vector3(point.x, point.y, point.z);
-    const marker = new THREE.Mesh(pointGeometry, pointMaterial);
-    marker.position.copy(pos);
-    group.add(marker);
-    notePoints.push({ label, pos, marker, theta: Pha5[index], phi: Pha3[index], r: Mag3[index] });
+async function loadPlotPoints() {
+  const datasets = await Promise.all(['notes', 'chords'].map(async kind => {
+    const response = await fetch('./json/' + kind + '.json', { cache: 'no-store' });
+    if (!response.ok) throw new Error('Could not load ' + kind + '.json: ' + response.status);
+    const data = await response.json();
+    const expected = kind === 'notes' ? 12 : 24;
+    if (![data.Mag3, data.Pha3, data.Pha5, data.Labels].every(
+      values => Array.isArray(values) && values.length === expected
+    )) throw new Error('Expected ' + expected + ' values in each ' + kind + '.json array');
+    return { kind, data };
+  }));
 
-    const el = document.createElement('div');
-    el.textContent = label;
-    Object.assign(el.style, {
-      position: 'absolute',
-      transform: 'translate(-50%, -50%)',
-      padding: '2px 5px',
-      borderRadius: '999px',
-      background: 'rgba(17,19,24,0.78)',
-      border: '1px solid rgba(244,247,251,0.25)',
-      fontSize: '11px',
-      color: '#f4f7fb',
-      whiteSpace: 'nowrap',
+  for (const { kind, data: { Mag3, Pha3, Pha5, Labels } } of datasets) {
+    Labels.forEach((label, index) => {
+      const theta = Pha5[index];
+      const phi = Pha3[index];
+      const r = Mag3[index];
+      const point = toroidalToCartesian(theta, phi, r, {}, torusSize.major, torusSize.minor);
+      const pos = new THREE.Vector3(point.x, point.y, point.z);
+      // Match the original plot: phase 5 (θ) maps from −π…+π around the hue wheel.
+      const hue = ((theta + Math.PI) / (2 * Math.PI) + 1) % 1;
+      const color = new THREE.Color().setHSL(hue, 0.85, 0.6);
+      const marker = new THREE.Mesh(pointGeometry, new THREE.MeshBasicMaterial({ color }));
+      marker.position.copy(pos);
+      group.add(marker);
+
+      const labelEl = document.createElement('div');
+      labelEl.className = 'torus-node-label';
+      labelEl.textContent = label;
+      labelLayer.appendChild(labelEl);
+      plottedPoints.push({ kind, pos, marker, labelEl, theta, phi, r });
     });
-    labelLayer.appendChild(el);
-    labelEls.push(el);
-  });
+  }
+  applyPlotMode();
 }
 // Settings change the geometry and the same polar positions used by every node.
 let resizeQueued = false;
@@ -331,7 +338,7 @@ function applyTorusSize() {
   torus.geometry = new THREE.TorusGeometry(torusSize.major, torusSize.minor, 30, 90);
   oldGeometry.dispose();
 
-  for (const note of notePoints) {
+  for (const note of plottedPoints) {
     toroidalToCartesian(
       note.theta, note.phi, note.r, note.pos, torusSize.major, torusSize.minor
     );
@@ -373,11 +380,11 @@ function updateTorusSettings() {
 majorRadiusInput.addEventListener('input', updateTorusSettings);
 minorRadiusInput.addEventListener('input', updateTorusSettings);
 
-loadNotePoints().catch(error => {
-  console.error('Note plotting failed:', error);
+loadPlotPoints().catch(error => {
+  console.error('Node plotting failed:', error);
   const message = document.createElement('div');
   message.className = 'note-load-error';
-  message.textContent = 'Notes could not load. Reload this page.';
+  message.textContent = 'Nodes could not load. Reload this page.';
   torusWindow.appendChild(message);
 });
 
@@ -393,15 +400,16 @@ function resizeThree() {
 const projectedPoint = new THREE.Vector3();
 function updateLabels() {
   const rect = torusWindow.getBoundingClientRect();
-  notePoints.forEach((item, index) => {
+  plottedPoints.forEach(item => {
+    if (!item.marker.visible) return;
     projectedPoint.copy(item.pos);
     group.localToWorld(projectedPoint);
     projectedPoint.project(camera);
     const x = (projectedPoint.x * 0.5 + 0.5) * rect.width;
     const y = (-projectedPoint.y * 0.5 + 0.5) * rect.height;
-    labelEls[index].style.left = x + 'px';
-    labelEls[index].style.top = y + 'px';
-    labelEls[index].style.opacity = projectedPoint.z > 1 ? '0.35' : '1';
+    item.labelEl.style.left = x + 'px';
+    item.labelEl.style.top = y + 'px';
+    item.labelEl.style.opacity = projectedPoint.z > 1 ? '0.35' : '1';
   });
 }
 

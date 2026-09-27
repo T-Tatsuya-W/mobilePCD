@@ -1,5 +1,6 @@
 import { AudioProcessor } from './audio/processor.js';
-import { pcdToFrequencyDomain, frequencyDomainToPcd } from './pcd-dft.js';
+import { TorusAudioOutput } from './audio/torus-output.js';
+import { pcdToFrequencyDomain } from './pcd-dft.js';
 import { TORUS_MAJOR_RADIUS, TORUS_MINOR_RADIUS, toroidalToCartesian } from './torus-coordinates.js?v=torus-settings-1';
 const THREE = window.THREE;
 
@@ -47,6 +48,16 @@ const pcdBars = document.getElementById('pcdBars');
 const latestMicPcd = new Float32Array(12);
 const pcdBarEls = [];
 const pcdNameEls = [];
+const pointerPcd = new Float32Array(12);
+const audioOutput = new TorusAudioOutput();
+const audioToggle = document.getElementById('audioToggle');
+const audioStatus = document.getElementById('audioStatus');
+const noteThresholdInput = document.getElementById('noteThreshold');
+const noteThresholdValue = document.getElementById('noteThresholdValue');
+const outputVolumeInput = document.getElementById('outputVolume');
+const outputVolumeValue = document.getElementById('outputVolumeValue');
+const octaveInputs = Array.from(document.querySelectorAll('.audio-octave'));
+let audioPending = false;
 let showPointerPcd = true;
 const sharpPcdNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
 const flatPcdNames = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
@@ -77,18 +88,63 @@ function drawPcd(values) {
   }
 }
 function updatePointerPcd() {
-  if (!showPointerPcd || !showPcdInput.checked) return;
-  const amplitudes = [1, 0, 0, Math.min(1, Math.hypot(state.radar.x, state.radar.y)), 0, 1, 0];
-  const phases = [0, 0, 0, Math.atan2(state.radar.y, state.radar.x), 0, state.thetaValue * Math.PI, 0];
-  const reconstructed = frequencyDomainToPcd(amplitudes, phases);
+  const theta = state.thetaValue * Math.PI;
+  const phi = Math.atan2(state.radar.y, state.radar.x);
+  const radius = Math.min(1, Math.hypot(state.radar.x, state.radar.y));
   let sum = 0;
+  // Inverse real DFT for DC=1, bin 3 magnitude=r, bin 5 magnitude=1.
+  // Reuse the same 12-value buffer for the display and sustained audio voices.
   for (let i = 0; i < 12; i++) {
-    reconstructed[i] = Math.max(0, reconstructed[i]);
-    sum += reconstructed[i];
+    const value = (1 + 2 * radius * Math.cos(2 * Math.PI * 3 * i / 12 + phi) +
+      2 * Math.cos(2 * Math.PI * 5 * i / 12 + theta)) / 12;
+    pointerPcd[i] = Math.max(0, value);
+    sum += pointerPcd[i];
   }
-  if (sum > 0) for (let i = 0; i < 12; i++) reconstructed[i] /= sum;
-  drawPcd(reconstructed);
+  if (sum > 0) for (let i = 0; i < 12; i++) pointerPcd[i] /= sum;
+  audioOutput.update(pointerPcd);
+  if (showPointerPcd && showPcdInput.checked) drawPcd(pointerPcd);
 }
+function updateAudioSettings() {
+  audioOutput.setThreshold(Number(noteThresholdInput.value));
+  audioOutput.setVolume(Number(outputVolumeInput.value));
+  audioOutput.setOctaves(octaveInputs.filter(input => input.checked).map(input => Number(input.value)));
+  noteThresholdValue.textContent = Number(noteThresholdInput.value).toFixed(2);
+  outputVolumeValue.textContent = Math.round(Number(outputVolumeInput.value) * 100) + '%';
+}
+noteThresholdInput.addEventListener('input', updateAudioSettings);
+outputVolumeInput.addEventListener('input', updateAudioSettings);
+octaveInputs.forEach(input => input.addEventListener('change', updateAudioSettings));
+updateAudioSettings();
+
+audioToggle.addEventListener('click', async () => {
+  if (audioPending) return;
+  audioPending = true;
+  audioToggle.disabled = true;
+  try {
+    if (audioOutput.isRunning()) {
+      await audioOutput.stop();
+      audioToggle.textContent = 'Start audio';
+      audioToggle.setAttribute('aria-pressed', 'false');
+      audioStatus.textContent = 'Audio off';
+    } else {
+      if (!octaveInputs.some(input => input.checked)) {
+        audioStatus.textContent = 'Select at least one octave';
+        return;
+      }
+      await audioOutput.start();
+      audioOutput.update(pointerPcd);
+      audioToggle.textContent = 'Stop audio';
+      audioToggle.setAttribute('aria-pressed', 'true');
+      audioStatus.textContent = 'Playing pointer PCD';
+    }
+  } catch (error) {
+    await audioOutput.stop();
+    audioStatus.textContent = 'Audio unavailable: ' + (error.name || 'error');
+  } finally {
+    audioPending = false;
+    audioToggle.disabled = false;
+  }
+});
 pcdSourceToggle.addEventListener('click', () => {
   showPointerPcd = !showPointerPcd;
   pcdSourceToggle.textContent = showPointerPcd ? 'Pointer PCD' : 'Mic PCD';
@@ -305,13 +361,15 @@ function updateMicIndicator() {
   micIndicator.style.boxShadow = '0 0 ' + (3 + 17 * level) + 'px #ff3345';
 }
 
-function clearLiveMarker() {
-  liveCoordinates = null;
-  if (typeof liveMarker !== 'undefined') liveMarker.visible = false;
+function dimLiveMarker() {
+  // Preserve the last valid position through silence and after mic capture stops.
+  if (!liveCoordinates) return;
+  liveMarker.material.color.setHex(0x9aa4b3);
+  liveMarker.material.opacity = 0.45;
 }
 
 async function stopMic(message = 'Mic off') {
-  clearLiveMarker();
+  dimLiveMarker();
   micRms = 0;
   latestMicPcd.fill(0);
   if (!showPointerPcd) {
@@ -373,7 +431,7 @@ audioProcessor.addEventListener('analysis', ({ detail: { pcd, rms, audioTime } }
       : peak < 0.0001 ? 'Mic active · no pitch bins' : 'Mic active';
   }
   if (rms < audioProcessor.config.pcdMinRms || audioTime === null) {
-    clearLiveMarker();
+    dimLiveMarker();
     return;
   }
   // Process at most 20 visual updates per second; keep only the latest PCD.
@@ -381,19 +439,23 @@ audioProcessor.addEventListener('analysis', ({ detail: { pcd, rms, audioTime } }
   lastPcdTime = audioTime;
   const { amplitudes, phases } = pcdToFrequencyDomain(Array.from(pcd));
   if (amplitudes[5] < 0.00001) {
-    clearLiveMarker();
+    dimLiveMarker();
     return;
   }
   liveCoordinates = { theta: phases[5], phi: phases[3], r: amplitudes[3] };
   updateLiveMarker();
+  liveMarker.material.color.setHex(0xffffff);
+  liveMarker.material.opacity = 1;
 });
 audioProcessor.addEventListener('error', ({ detail: error }) => {
+  dimLiveMarker();
   micStatus.textContent = 'Analysis error: ' + (error?.message || 'unknown');
   console.error('Mic analysis failed:', error);
 });
 window.addEventListener('pagehide', () => {
   micPageHidden = true;
   stopMic();
+  audioOutput.stop();
 });
 
 // ---------------- Three.js prototype scene ----------------
@@ -503,7 +565,7 @@ function updatePointer() {
 // A single marker follows the latest microphone PCD; radius edits reposition it.
 const liveMarker = new THREE.Mesh(
   new THREE.SphereGeometry(0.14, 20, 16),
-  new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false })
+  new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, depthTest: false })
 );
 liveMarker.renderOrder = 3;
 liveMarker.visible = false;

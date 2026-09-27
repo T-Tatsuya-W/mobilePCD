@@ -1,26 +1,9 @@
 # Interaction prototype
 
-This folder is a standalone technology test for the next mobilePCD interface.
+Standalone mobilePCD control and torus experiment. Serve the repository over HTTP/HTTPS and open `/prototype/` (or `https://t-tatsuya-w.github.io/mobilePCD/prototype/` on GitHub Pages).
 
-## Goals
-
-- prove simultaneous two-finger interaction on mobile
-- test an infinite relative left-side control
-- test a circular XY/radar pad that remembers its last position
-- test Web Audio parameter smoothing and touch-triggered sound
-- test a transparent Three.js torus with points, lines and labels
-- stop audio automatically when the page becomes hidden
-
-## Run
-
-Serve the repository over HTTP/HTTPS and open:
-
-`/prototype/`
-
-On GitHub Pages this should be available at:
-
-`https://t-tatsuya-w.github.io/mobilePCD/prototype/`
-
-## Notes
-
-This prototype intentionally does **not** modify or depend on the existing main app. Once the interaction model feels right on a phone, the next step is to wire in the existing PCD/audio analysis modules.
+- The left strip sets θ; the circular pad reports Φ and r.
+- The 12 chromatic note nodes come from `./json/notes.json`. Each note began as a one-hot, 12-bin PCD and was transformed with the local copy of `pcd-dft.js`.
+- `torus-coordinates.js` maps DFT bins to θ = phase 5, Φ = phase 3, r = magnitude 3. Its `toroidalToCartesian(theta, phi, r)` function maps these values to the prototype torus in the XY plane. r = 0 is the tube centreline, r = 1 its surface; Φ = 0 points outward.
+- The renderer and all of its data and transformation code live inside `prototype/`. The root `json/notes.json` is populated in the same schema as `json/chords.json` for the existing app.
+- The prototype does not yet connect the live microphone PCD or interactive controls to the plotted note positions.

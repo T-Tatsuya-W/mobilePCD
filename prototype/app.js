@@ -38,6 +38,11 @@ const torusSize = { major: TORUS_MAJOR_RADIUS, minor: TORUS_MINOR_RADIUS };
 const micToggle = document.getElementById('micToggle');
 const micStatus = document.getElementById('micStatus');
 const micIndicator = document.getElementById('micIndicator');
+const micSensitivityInput = document.getElementById('micSensitivity');
+const micSensitivityValue = document.getElementById('micSensitivityValue');
+micSensitivityInput.addEventListener('input', () => {
+  micSensitivityValue.textContent = Number(micSensitivityInput.value).toFixed(1) + '×';
+});
 
 function updateThetaSlider() {
   thetaValueEl.textContent = state.thetaValue.toFixed(2) + 'π';
@@ -259,7 +264,7 @@ function updateMicIndicator() {
   let sum = 0;
   for (let i = 0; i < micSamples.length; i++) sum += micSamples[i] * micSamples[i];
   const rms = Math.sqrt(sum / micSamples.length);
-  const level = Math.min(1, rms * 7);
+  const level = Math.min(1, rms * Number(micSensitivityInput.value));
   micIndicator.style.opacity = String(0.35 + level * 0.65);
   micIndicator.style.boxShadow = '0 0 ' + (3 + 17 * level) + 'px #ff3345';
 }

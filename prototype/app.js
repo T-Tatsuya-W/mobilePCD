@@ -62,6 +62,38 @@ let showPointerPcd = true;
 const sharpPcdNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
 const flatPcdNames = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
 
+const thetaTrack = thetaSliderPanel.querySelector('.theta-slider-track');
+const thetaLabelModeButton = document.getElementById('thetaLabelMode');
+let showThetaNotes = false;
+const thetaTickLabels = [];
+// The phase-5 circle advances one perfect fifth per π/6: C, G, D ... F♯.
+const thetaFractions = ['0', 'π/6', 'π/3', 'π/2', '2π/3', '5π/6', 'π'];
+for (let step = 6; step >= -6; step--) {
+  const tick = document.createElement('div');
+  tick.className = 'theta-tick';
+  tick.style.top = ((6 - step) / 12 * 100) + '%';
+  const label = document.createElement('span');
+  tick.appendChild(label);
+  thetaTrack.insertBefore(tick, thetaMarker);
+  thetaTickLabels.push({ step, label });
+}
+function updateThetaTickLabels() {
+  const names = useFlats ? flatPcdNames : sharpPcdNames;
+  for (const { step, label } of thetaTickLabels) {
+    const pitchClass = ((step * 7) % 12 + 12) % 12;
+    label.textContent = showThetaNotes ? names[pitchClass] :
+      step === 0 ? '0' : (step > 0 ? '+' : '−') + thetaFractions[Math.abs(step)];
+  }
+}
+thetaLabelModeButton.addEventListener('click', () => {
+  showThetaNotes = !showThetaNotes;
+  thetaLabelModeButton.textContent = showThetaNotes ? 'Circle of fifths' : 'π fractions';
+  thetaLabelModeButton.setAttribute('aria-pressed', String(showThetaNotes));
+  updateThetaTickLabels();
+});
+updateThetaTickLabels();
+
+
 for (let i = 0; i < 12; i++) {
   const column = document.createElement('div');
   column.className = 'pcd-column';
@@ -708,6 +740,7 @@ plotInputs.notes.addEventListener('change', applyPlotMode);
 plotInputs.chords.addEventListener('change', applyPlotMode);
 
 function applyAccidentalMode() {
+  updateThetaTickLabels();
   for (const point of plottedPoints) {
     const label = useFlats ? point.flatLabel : point.sharpLabel;
     point.labelEl.textContent = label;

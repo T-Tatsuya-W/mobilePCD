@@ -25,6 +25,7 @@ const minorRadiusInput = document.getElementById('minorRadius');
 const majorRadiusValue = document.getElementById('majorRadiusValue');
 const minorRadiusValue = document.getElementById('minorRadiusValue');
 const plotModeInput = document.getElementById('plotMode');
+const accidentalModeInput = document.getElementById('accidentalMode');
 const torusSize = { major: TORUS_MAJOR_RADIUS, minor: TORUS_MINOR_RADIUS };
 
 function updateThetaSlider() {
@@ -295,19 +296,26 @@ function applyPlotMode() {
 }
 plotModeInput.addEventListener('change', applyPlotMode);
 
+function applyAccidentalMode() {
+  for (const point of plottedPoints) {
+    point.labelEl.textContent = accidentalModeInput.value === 'flats' ? point.flatLabel : point.sharpLabel;
+  }
+}
+accidentalModeInput.addEventListener('change', applyAccidentalMode);
+
 async function loadPlotPoints() {
   const datasets = await Promise.all(['notes', 'chords'].map(async kind => {
     const response = await fetch('./json/' + kind + '.json', { cache: 'no-store' });
     if (!response.ok) throw new Error('Could not load ' + kind + '.json: ' + response.status);
     const data = await response.json();
     const expected = kind === 'notes' ? 12 : 24;
-    if (![data.Mag3, data.Pha3, data.Pha5, data.Labels].every(
+    if (![data.Mag3, data.Pha3, data.Pha5, data.Labels, data.LabelsFlat].every(
       values => Array.isArray(values) && values.length === expected
     )) throw new Error('Expected ' + expected + ' values in each ' + kind + '.json array');
     return { kind, data };
   }));
 
-  for (const { kind, data: { Mag3, Pha3, Pha5, Labels } } of datasets) {
+  for (const { kind, data: { Mag3, Pha3, Pha5, Labels, LabelsFlat } } of datasets) {
     Labels.forEach((label, index) => {
       const theta = Pha5[index];
       const phi = Pha3[index];
@@ -325,10 +333,11 @@ async function loadPlotPoints() {
       labelEl.className = 'torus-node-label';
       labelEl.textContent = label;
       labelLayer.appendChild(labelEl);
-      plottedPoints.push({ kind, pos, marker, labelEl, theta, phi, r });
+      plottedPoints.push({ kind, pos, marker, labelEl, sharpLabel: label, flatLabel: LabelsFlat[index], theta, phi, r });
     });
   }
   applyPlotMode();
+  applyAccidentalMode();
 }
 // Settings change the geometry and the same polar positions used by every node.
 let resizeQueued = false;

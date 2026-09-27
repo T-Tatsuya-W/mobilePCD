@@ -102,5 +102,31 @@
         "A#m",
         "BM",
         "Bm"
+    ],
+    "LabelsFlat": [
+        "CM",
+        "Cm",
+        "D♭M",
+        "D♭m",
+        "DM",
+        "Dm",
+        "E♭M",
+        "E♭m",
+        "EM",
+        "Em",
+        "FM",
+        "Fm",
+        "G♭M",
+        "G♭m",
+        "GM",
+        "Gm",
+        "A♭M",
+        "A♭m",
+        "AM",
+        "Am",
+        "B♭M",
+        "B♭m",
+        "BM",
+        "Bm"
     ]
 }

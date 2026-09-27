@@ -177,8 +177,8 @@ const tiltGroup = new THREE.Group();
 scene.add(tiltGroup);
 const group = new THREE.Group();
 tiltGroup.add(group);
-let tilt = 0.85;
-let spin = Math.PI / 2;
+let tilt = -0.85;
+let spin = -Math.PI / 2;
 let viewPointerId = null;
 let lastViewX = 0;
 let lastViewY = 0;
@@ -193,7 +193,7 @@ container.addEventListener('pointerdown', (event) => {
 container.addEventListener('pointermove', (event) => {
   if (event.pointerId !== viewPointerId) return;
   const scale = Math.max(1, container.clientWidth);
-  spin -= (event.clientX - lastViewX) / scale * Math.PI * 2;
+  spin += (event.clientX - lastViewX) / scale * Math.PI * 2;
   tilt += (event.clientY - lastViewY) / scale * Math.PI;
   lastViewX = event.clientX;
   lastViewY = event.clientY;

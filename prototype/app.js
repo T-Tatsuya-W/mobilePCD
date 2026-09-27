@@ -1,3 +1,5 @@
+import { AudioProcessor } from './audio/processor.js';
+import { pcdToFrequencyDomain } from './pcd-dft.js';
 import { TORUS_MAJOR_RADIUS, TORUS_MINOR_RADIUS, toroidalToCartesian } from './torus-coordinates.js?v=torus-settings-1';
 const THREE = window.THREE;
 
@@ -40,6 +42,15 @@ const micStatus = document.getElementById('micStatus');
 const micIndicator = document.getElementById('micIndicator');
 const micSensitivityInput = document.getElementById('micSensitivity');
 const micSensitivityValue = document.getElementById('micSensitivityValue');
+const pcdControls = {
+  pcdMinRms: document.getElementById('pcdMinRms'),
+  pcdThreshold: document.getElementById('pcdThreshold'),
+  pcdNormalize: document.getElementById('pcdNormalize'),
+  smoothing: document.getElementById('pcdSmoothing'),
+  minHz: document.getElementById('pcdMinHz'),
+  maxHz: document.getElementById('pcdMaxHz'),
+  refA4: document.getElementById('pcdRefA4'),
+};
 micSensitivityInput.addEventListener('input', () => {
   micSensitivityValue.textContent = Number(micSensitivityInput.value).toFixed(1) + '×';
 });
@@ -190,24 +201,50 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// Keep only one analyser buffer. Audio never connects to speakers or storage.
-let micStream = null;
-let micContext = null;
-let micSource = null;
-let micAnalyser = null;
-let micSamples = null;
+// One capture pipeline owns a fixed-size audio ring buffer and emits live PCD frames.
+const audioProcessor = new AudioProcessor({
+  windowSize: 8192,
+  hopSize: 2048,
+  tuner: { enabled: false },
+});
 let micPending = false;
 let micPageHidden = false;
+let lastPcdTime = -Infinity;
+let liveCoordinates = null;
+let micRms = 0;
 
-function stopMic(message = 'Mic off') {
-  if (micStream) {
-    micStream.getTracks().forEach(track => track.stop());
-    micStream = null;
-  }
-  if (micSource) micSource.disconnect();
-  if (micAnalyser) micAnalyser.disconnect();
-  if (micContext) micContext.close().catch(console.error);
-  micSource = micAnalyser = micContext = micSamples = null;
+for (const [key, input] of Object.entries(pcdControls)) {
+  const output = document.getElementById(input.id + 'Value');
+  const update = () => {
+    const value = Number(input.value);
+    output.textContent = key === 'pcdMinRms' ? value.toFixed(4) :
+      key === 'pcdThreshold' ? value.toFixed(3) :
+      key === 'smoothing' || key === 'pcdNormalize' ? value.toFixed(2) :
+      String(value);
+    audioProcessor.updateConfig({ [key]: value });
+    // A silence threshold change should be reflected before another PCD frame.
+    updateMicIndicator();
+  };
+  input.addEventListener('input', update);
+  update();
+}
+
+function updateMicIndicator() {
+  if (!audioProcessor.isRunning()) return;
+  const level = Math.min(1, micRms * Number(micSensitivityInput.value));
+  micIndicator.style.opacity = String(0.35 + level * 0.65);
+  micIndicator.style.boxShadow = '0 0 ' + (3 + 17 * level) + 'px #ff3345';
+}
+
+function clearLiveMarker() {
+  liveCoordinates = null;
+  if (typeof liveMarker !== 'undefined') liveMarker.visible = false;
+}
+
+async function stopMic(message = 'Mic off') {
+  clearLiveMarker();
+  micRms = 0;
+  await audioProcessor.stop();
   micIndicator.hidden = true;
   micIndicator.style.opacity = '0.35';
   micIndicator.style.boxShadow = '0 0 3px #ff3345';
@@ -217,60 +254,60 @@ function stopMic(message = 'Mic off') {
 }
 
 micToggle.addEventListener('click', async () => {
-  if (micStream) {
-    stopMic();
-    return;
-  }
   if (micPending) return;
   micPending = true;
   micToggle.disabled = true;
-  micStatus.textContent = 'Requesting mic…';
-  let stream = null;
-  let context = null;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    if (micPageHidden) throw new Error('Page closed');
-    context = new (window.AudioContext || window.webkitAudioContext)();
-    const source = context.createMediaStreamSource(stream);
-    const analyser = context.createAnalyser();
-    analyser.fftSize = 1024;
-    source.connect(analyser);
-    await context.resume();
-    micStream = stream;
-    micContext = context;
-    micSource = source;
-    micAnalyser = analyser;
-    micSamples = new Float32Array(analyser.fftSize);
-    stream.getAudioTracks().forEach(track => {
-      track.addEventListener('ended', () => stopMic('Mic disconnected'), { once: true });
-    });
-    micIndicator.hidden = false;
-    micToggle.textContent = 'Stop mic';
-    micToggle.setAttribute('aria-pressed', 'true');
-    micStatus.textContent = 'Mic active';
+    if (audioProcessor.isRunning()) {
+      await stopMic();
+    } else {
+      micStatus.textContent = 'Requesting mic…';
+      await audioProcessor.start();
+      if (micPageHidden) {
+        await stopMic();
+        return;
+      }
+      await audioProcessor.audioContext.resume();
+      audioProcessor.micStream.getAudioTracks().forEach(track => {
+        track.addEventListener('ended', () => {
+          if (audioProcessor.isRunning()) stopMic('Mic disconnected');
+        }, { once: true });
+      });
+      lastPcdTime = -Infinity;
+      micIndicator.hidden = false;
+      micToggle.textContent = 'Stop mic';
+      micToggle.setAttribute('aria-pressed', 'true');
+      micStatus.textContent = 'Mic active';
+    }
   } catch (error) {
-    stream?.getTracks().forEach(track => track.stop());
-    if (context) context.close().catch(console.error);
-    micStatus.textContent = 'Mic unavailable: ' + (error.name || 'access denied');
+    await stopMic('Mic unavailable: ' + (error.name || 'access denied'));
   } finally {
     micPending = false;
     micToggle.disabled = false;
   }
 });
 
-function updateMicIndicator() {
-  if (!micAnalyser || !micSamples) return;
-  micAnalyser.getFloatTimeDomainData(micSamples);
-  let sum = 0;
-  for (let i = 0; i < micSamples.length; i++) sum += micSamples[i] * micSamples[i];
-  const rms = Math.sqrt(sum / micSamples.length);
-  const level = Math.min(1, rms * Number(micSensitivityInput.value));
-  micIndicator.style.opacity = String(0.35 + level * 0.65);
-  micIndicator.style.boxShadow = '0 0 ' + (3 + 17 * level) + 'px #ff3345';
-}
+audioProcessor.addEventListener('analysis', ({ detail: { pcd, rms, audioTime } }) => {
+  micRms = rms;
+  updateMicIndicator();
+  if (rms < audioProcessor.config.pcdMinRms || audioTime === null) {
+    clearLiveMarker();
+    return;
+  }
+  // Process at most 20 visual updates per second; keep only the latest PCD.
+  if (audioTime - lastPcdTime < 0.05) return;
+  lastPcdTime = audioTime;
+  const { amplitudes, phases } = pcdToFrequencyDomain(Array.from(pcd));
+  if (amplitudes[5] < 0.00001) {
+    clearLiveMarker();
+    return;
+  }
+  liveCoordinates = { theta: phases[5], phi: phases[3], r: amplitudes[3] };
+  updateLiveMarker();
+});
 window.addEventListener('pagehide', () => {
   micPageHidden = true;
-  if (micStream) stopMic();
+  stopMic();
 });
 
 // ---------------- Three.js prototype scene ----------------
@@ -375,6 +412,23 @@ function updatePointer() {
   const r = Math.min(1, Math.hypot(state.radar.x, state.radar.y));
   toroidalToCartesian(theta, phi, r, pointer.position, torusSize.major, torusSize.minor);
   pointerMaterial.opacity = state.radar.held ? 1 : 0.55;
+}
+
+// A single marker follows the latest microphone PCD; radius edits reposition it.
+const liveMarker = new THREE.Mesh(
+  new THREE.SphereGeometry(0.14, 20, 16),
+  new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false })
+);
+liveMarker.renderOrder = 3;
+liveMarker.visible = false;
+group.add(liveMarker);
+function updateLiveMarker() {
+  if (!liveCoordinates) return;
+  toroidalToCartesian(
+    liveCoordinates.theta, liveCoordinates.phi, liveCoordinates.r,
+    liveMarker.position, torusSize.major, torusSize.minor
+  );
+  liveMarker.visible = true;
 }
 
 const pointGeometry = new THREE.SphereGeometry(0.09, 18, 14);
@@ -573,6 +627,7 @@ function applyTorusSize() {
   updateThetaSlice();
   updatePointer();
   updateConnectionPositions();
+  updateLiveMarker();
 
   // Keep the full torus in the square viewing window at larger sizes.
   const halfFov = THREE.MathUtils.degToRad(camera.fov / 2);
@@ -671,7 +726,6 @@ function animate() {
   group.rotation.z = spin;
   tiltGroup.updateMatrixWorld(true);
 
-  updateMicIndicator();
   renderer.render(scene, camera);
   updateLabels();
   requestAnimationFrame(animate);

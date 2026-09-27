@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#111318" />
   <title>mobilePCD Interaction Prototype</title>
-  <link rel="stylesheet" href="./styles.css?v=mic-sensitivity-1" />
+  <link rel="stylesheet" href="./styles.css?v=live-pcd-1" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" href="./icon.svg" type="image/svg+xml" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -48,6 +48,20 @@
           <div id="micStatus" class="mic-status" role="status" aria-live="polite">Mic off</div>
           <label for="micSensitivity">Mic light sensitivity <output id="micSensitivityValue">7.0×</output></label>
           <input id="micSensitivity" type="range" min="1" max="30" step="0.5" value="7" />
+          <label for="pcdMinRms">Minimum input level <output id="pcdMinRmsValue">0.0010</output></label>
+          <input id="pcdMinRms" type="range" min="0" max="0.02" step="0.0005" value="0.001" />
+          <label for="pcdThreshold">Pitch bin threshold <output id="pcdThresholdValue">0.005</output></label>
+          <input id="pcdThreshold" type="range" min="0" max="0.1" step="0.001" value="0.005" />
+          <label for="pcdNormalize">PCD contrast <output id="pcdNormalizeValue">1.00</output></label>
+          <input id="pcdNormalize" type="range" min="0.5" max="3" step="0.05" value="1" />
+          <label for="pcdSmoothing">PCD smoothing <output id="pcdSmoothingValue">0.60</output></label>
+          <input id="pcdSmoothing" type="range" min="0" max="0.95" step="0.05" value="0.6" />
+          <label for="pcdMinHz">Low frequency <output id="pcdMinHzValue">50</output> Hz</label>
+          <input id="pcdMinHz" type="range" min="30" max="400" step="10" value="50" />
+          <label for="pcdMaxHz">High frequency <output id="pcdMaxHzValue">5000</output> Hz</label>
+          <input id="pcdMaxHz" type="range" min="1000" max="8000" step="100" value="5000" />
+          <label for="pcdRefA4">Reference A4 <output id="pcdRefA4Value">440</output> Hz</label>
+          <input id="pcdRefA4" type="range" min="430" max="450" step="1" value="440" />
           <h2>Torus to audio settings</h2>
         </div>
       </section>
@@ -72,6 +86,6 @@
 
   </main>
 
-  <script type="module" src="./app.js?v=mic-sensitivity-1"></script>
+  <script type="module" src="./app.js?v=live-pcd-1"></script>
 </body>
 </html>

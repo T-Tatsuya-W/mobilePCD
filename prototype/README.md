@@ -24,3 +24,5 @@ Standalone mobilePCD control and torus experiment. Serve the repository over HTT
 - The PCD strip defaults to the pointer reconstruction, so it displays bars before the microphone starts. The torus settings overlay leaves the strip exposed while open; use its PCD display button to view the live mic PCD instead.
 
 - PCD bar heights are scaled to the strongest current pitch class so quiet/spread-out PCDs remain visible; the underlying values stay unchanged. The mic display reports waiting for frames, low input level, missing pitch bins, or analysis errors instead of silently showing empty bars.
+
+- PCD bars are red for the pointer source and blue for the microphone source; there is no title in the strip. The Show PCD checkbox hides the strip and gives the settings overlay the full torus window height. Mic analysis status remains in the Mic to torus settings section.

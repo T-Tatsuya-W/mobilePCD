@@ -350,6 +350,7 @@ function updateRadarUi() {
 thetaSliderPanel.addEventListener('pointerdown', (event) => {
   if (state.thetaPointerId !== null) return;
   state.thetaPointerId = event.pointerId;
+  wheelPixelRemainder = 0;
   state.thetaLastY = event.clientY;
   state.thetaLastTime = event.timeStamp;
   thetaSliderPanel.setPointerCapture(event.pointerId);
@@ -380,17 +381,41 @@ function moveTheta(delta) {
   updateThetaSlider();
 }
 
-// A mouse wheel adjusts θ from anywhere in the workspace, at half the previous
-// distance per notch. Leave the settings overlay free to scroll normally.
+// A mouse wheel uses 24 exact positions around θ (π/12 apart); note ticks
+// remain π/6 apart. Small trackpad deltas accumulate into a single step.
+let wheelPixelRemainder = 0;
 window.addEventListener('wheel', (event) => {
   if (event.ctrlKey || torusSettings.contains(event.target)) return;
   const finePointer = window.matchMedia('(any-pointer: fine)').matches;
   if (!finePointer && !thetaSliderPanel.contains(event.target)) return;
   event.preventDefault();
-  const height = Math.max(1, thetaSliderPanel.querySelector('.theta-slider-track').clientHeight);
-  const pixels = event.deltaMode === 1 ? event.deltaY * 16 :
-    event.deltaMode === 2 ? event.deltaY * height : event.deltaY;
-  moveTheta(-pixels * (finePointer ? 1 : 2) / height);
+  if (!finePointer) {
+    // Keep the original panel-only wheel behaviour on coarse-pointer devices.
+    const height = Math.max(1, thetaSliderPanel.querySelector('.theta-slider-track').clientHeight);
+    const pixels = event.deltaMode === 1 ? event.deltaY * 16 :
+      event.deltaMode === 2 ? event.deltaY * height : event.deltaY;
+    moveTheta(-pixels * 2 / height);
+    return;
+  }
+  let steps;
+  if (event.deltaMode !== 0 || Math.abs(event.deltaY) >= 40) {
+    // One conventional wheel notch is one position, independent of whether
+    // the browser reports 100 or 120 pixels for it.
+    wheelPixelRemainder = 0;
+    steps = Math.sign(event.deltaY) * Math.max(1, Math.round(
+      Math.abs(event.deltaY) / (event.deltaMode === 0 ? 100 : event.deltaMode === 1 ? 3 : 1)
+    ));
+  } else {
+    wheelPixelRemainder += event.deltaY;
+    steps = Math.trunc(wheelPixelRemainder / 60);
+    wheelPixelRemainder -= steps * 60;
+  }
+  if (!steps) return;
+  const index = Math.round(state.thetaUnwrapped * 12) - steps;
+  state.thetaUnwrapped = index / 12;
+  // Wrap the integer position before dividing to avoid cumulative wheel drift.
+  state.thetaValue = (((index + 12) % 24 + 24) % 24 - 12) / 12;
+  updateThetaSlider();
 }, { passive: false });
 
 function endThetaSwipe(event) {

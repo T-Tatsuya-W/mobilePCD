@@ -366,3 +366,8 @@ body {
 .audio-octave-heading { font-size: .8rem; color: #dce8f7; }
 .audio-octaves { display: flex; justify-content: space-between; gap: 4px; }
 .audio-octaves label { display: inline-flex; align-items: center; gap: 2px; font-size: .8rem; }
+
+/* In the red pointer PCD, emphasise pitches eligible to sound at the set threshold. */
+.pcd-strip:not(.mic-source) .pcd-bar-fill { background: #873740; }
+.pcd-strip:not(.mic-source) .pcd-column.active-note .pcd-bar-fill { background: #ff525e; box-shadow: 0 0 7px rgba(255,82,94,.9); }
+.pcd-strip:not(.mic-source) .pcd-column.active-note { color: #fff; font-weight: 800; text-shadow: 0 0 4px #ff525e; }

@@ -380,13 +380,17 @@ function moveTheta(delta) {
   updateThetaSlider();
 }
 
-// Mouse wheel and trackpads can keep turning the same circular scale.
-thetaSliderPanel.addEventListener('wheel', (event) => {
+// A mouse wheel adjusts θ from anywhere in the workspace, at half the previous
+// distance per notch. Leave the settings overlay free to scroll normally.
+window.addEventListener('wheel', (event) => {
+  if (event.ctrlKey || torusSettings.contains(event.target)) return;
+  const finePointer = window.matchMedia('(any-pointer: fine)').matches;
+  if (!finePointer && !thetaSliderPanel.contains(event.target)) return;
   event.preventDefault();
   const height = Math.max(1, thetaSliderPanel.querySelector('.theta-slider-track').clientHeight);
   const pixels = event.deltaMode === 1 ? event.deltaY * 16 :
     event.deltaMode === 2 ? event.deltaY * height : event.deltaY;
-  moveTheta(-pixels * 2 / height);
+  moveTheta(-pixels * (finePointer ? 1 : 2) / height);
 }, { passive: false });
 
 function endThetaSwipe(event) {

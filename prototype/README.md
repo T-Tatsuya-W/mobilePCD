@@ -14,3 +14,5 @@ Standalone mobilePCD control and torus experiment. Serve the repository over HTT
 - The prototype does not yet connect live microphone PCD to the plotted note positions.
 
 - Radar range sits in its own settings section. Start mic requests live audio input; a red indicator in the torus window brightens with RMS volume. A single reusable 1024-sample buffer holds audio for analysis without recording it or routing it to output. Stop mic or leave the page to release the stream and audio context. Microphone input requires HTTPS and browser permission.
+
+- Mic light sensitivity (1×–30×, default 7×) scales the live RMS level used only for the red indicator. It does not change captured audio or future PCD analysis.

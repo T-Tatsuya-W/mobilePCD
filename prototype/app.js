@@ -26,17 +26,24 @@ const majorRadiusValue = document.getElementById('majorRadiusValue');
 const minorRadiusValue = document.getElementById('minorRadiusValue');
 const plotModeInput = document.getElementById('plotMode');
 const accidentalModeInput = document.getElementById('accidentalMode');
+const radarRangeInput = document.getElementById('radarRange');
+const radarRangeValue = document.getElementById('radarRangeValue');
+const thetaMarker = document.getElementById('thetaMarker');
+const thetaMarkerGhost = document.getElementById('thetaMarkerGhost');
 const torusSize = { major: TORUS_MAJOR_RADIUS, minor: TORUS_MINOR_RADIUS };
 
 function updateThetaSlider() {
   thetaValueEl.textContent = state.thetaValue.toFixed(2) + 'π';
-  document.getElementById('thetaMarker').style.top = ((1 - state.thetaValue) * 50) + '%';
+  thetaMarker.style.top = ((1 - state.thetaValue) * 50) + '%';
+  const hue = ((state.thetaValue + 1) * 180 + 360) % 360;
+  thetaSliderPanel.style.setProperty('--theta-hue', hue);
   // Show the same point at both ends near ±π, like a seam on a circular scale.
-  const ghost = document.getElementById('thetaMarkerGhost');
+  const ghost = thetaMarkerGhost;
   ghost.style.top = state.thetaValue >= 0 ? '100%' : '0%';
   ghost.style.opacity = Math.abs(state.thetaValue) > 0.9 ? '0.55' : '0';
   updatePointer();
   updateThetaSlice();
+  updateRadarNodes();
 }
 
 function updateRadarUi() {
@@ -277,6 +284,25 @@ function updatePointer() {
 
 const pointGeometry = new THREE.SphereGeometry(0.09, 18, 14);
 const plottedPoints = [];
+const radarNodes = document.createElement('div');
+radarNodes.className = 'radar-nodes';
+radarPad.insertBefore(radarNodes, radarPoint);
+
+function updateRadarNodes() {
+  const theta = state.thetaValue * Math.PI;
+  const range = Number(radarRangeInput.value) * Math.PI;
+  for (const point of plottedPoints) {
+    const angularDistance = Math.abs(Math.atan2(Math.sin(point.theta - theta), Math.cos(point.theta - theta)));
+    const visibleKind = plotModeInput.value === 'both' || plotModeInput.value === point.kind;
+    const opacity = Math.max(0, 1 - angularDistance / range);
+    point.radarEl.hidden = !visibleKind || opacity <= 0;
+    if (!point.radarEl.hidden) point.radarEl.style.opacity = opacity.toFixed(3);
+  }
+}
+radarRangeInput.addEventListener('input', () => {
+  radarRangeValue.textContent = Number(radarRangeInput.value).toFixed(2) + 'π';
+  updateRadarNodes();
+});
 
 const labelLayer = document.createElement('div');
 labelLayer.className = 'label-layer';
@@ -361,6 +387,7 @@ async function loadConnections() {
   }
   updateConnectionPositions();
   updateConnectionVisibility();
+  updateRadarNodes();
 }
 
 function applyPlotMode() {
@@ -370,12 +397,15 @@ function applyPlotMode() {
     point.labelEl.hidden = !visible;
   }
   updateConnectionVisibility();
+  updateRadarNodes();
 }
 plotModeInput.addEventListener('change', applyPlotMode);
 
 function applyAccidentalMode() {
   for (const point of plottedPoints) {
-    point.labelEl.textContent = accidentalModeInput.value === 'flats' ? point.flatLabel : point.sharpLabel;
+    const label = accidentalModeInput.value === 'flats' ? point.flatLabel : point.sharpLabel;
+    point.labelEl.textContent = label;
+    point.radarEl.textContent = label;
   }
 }
 accidentalModeInput.addEventListener('change', applyAccidentalMode);
@@ -410,7 +440,15 @@ async function loadPlotPoints() {
       labelEl.className = 'torus-node-label';
       labelEl.textContent = label;
       labelLayer.appendChild(labelEl);
-      plottedPoints.push({ kind, pos, marker, labelEl, sharpLabel: label, flatLabel: LabelsFlat[index], theta, phi, r });
+      const radarEl = document.createElement('span');
+      radarEl.className = 'radar-node';
+      radarEl.textContent = label;
+      radarEl.style.left = (50 + 50 * r * Math.cos(phi)) + '%';
+      radarEl.style.top = (50 - 50 * r * Math.sin(phi)) + '%';
+      radarEl.style.backgroundColor = '#' + color.getHexString();
+      radarEl.hidden = true;
+      radarNodes.appendChild(radarEl);
+      plottedPoints.push({ kind, pos, marker, labelEl, radarEl, sharpLabel: label, flatLabel: LabelsFlat[index], theta, phi, r });
     });
   }
   applyPlotMode();

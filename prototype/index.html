@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#111318" />
   <title>mobilePCD Interaction Prototype</title>
-  <link rel="stylesheet" href="./styles.css?v=connections-1" />
+  <link rel="stylesheet" href="./styles.css?v=radar-nearby-1" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" href="./icon.svg" type="image/svg+xml" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -40,6 +40,8 @@
           <select id="accidentalMode"><option value="sharps">Sharps (♯)</option><option value="flats">Flats (♭)</option></select>
           <label for="noteConnections">Note connections <input id="noteConnections" type="checkbox" /></label>
           <label for="chordConnections">Chord connections <input id="chordConnections" type="checkbox" /></label>
+          <label for="radarRange">Radar range <output id="radarRangeValue">0.25π</output></label>
+          <input id="radarRange" type="range" min="0.01" max="0.50" step="0.01" value="0.25" />
           <h2>Mic to torus settings</h2>
           <h2>Torus to audio settings</h2>
         </div>
@@ -65,6 +67,6 @@
 
   </main>
 
-  <script type="module" src="./app.js?v=connections-1"></script>
+  <script type="module" src="./app.js?v=radar-nearby-1"></script>
 </body>
 </html>

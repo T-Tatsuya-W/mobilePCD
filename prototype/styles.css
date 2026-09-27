@@ -96,9 +96,9 @@ body {
   left: 0;
   width: 45%;
   height: 3px;
-  background: #9affc9;
+  background: hsl(var(--theta-hue, 180) 85% 60%);
   transform: translateY(-50%);
-  box-shadow: 0 0 8px #9affc9;
+  box-shadow: 0 0 8px hsl(var(--theta-hue, 180) 85% 60%);
   pointer-events: none;
 }
 .theta-marker-ghost { opacity: 0; }
@@ -325,3 +325,8 @@ body {
 .torus-settings select { width: 100%; min-height: 36px; padding: 5px 8px; color: #f4f7fb; background: #1b222c; border: 1px solid #475875; border-radius: 8px; font: inherit; }
 .torus-node-label { position: absolute; transform: translate(-50%, -50%); padding: 1px 3px; border-radius: 4px; background: rgba(17, 19, 24, 0.12); color: #f4f7fb; font-size: 10px; line-height: 1.2; text-shadow: 0 1px 3px #000, 0 0 3px #000; white-space: nowrap; }
 .torus-node-label[hidden] { display: none; }
+
+.radar-nodes { position: absolute; inset: 0; pointer-events: none; }
+.radar-node { position: absolute; transform: translate(-50%, -50%); z-index: 2; min-width: 12px; min-height: 12px; padding: 1px 2px; border-radius: 999px; display: grid; place-items: center; font: 600 clamp(7px, 1.4vw, 10px)/1 ui-monospace, monospace; color: #0b1015; white-space: nowrap; text-shadow: 0 1px rgba(255,255,255,.25); }
+.radar-node[hidden] { display: none; }
+.radar-point { z-index: 3; }

@@ -47,7 +47,7 @@ const pcdBars = document.getElementById('pcdBars');
 const latestMicPcd = new Float32Array(12);
 const pcdBarEls = [];
 const pcdNameEls = [];
-let showPointerPcd = false;
+let showPointerPcd = true;
 const sharpPcdNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
 const flatPcdNames = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
 
@@ -94,7 +94,7 @@ pcdSourceToggle.addEventListener('click', () => {
   if (showPointerPcd) updatePointerPcd();
   else drawPcd(latestMicPcd);
 });
-drawPcd(latestMicPcd);
+updatePointerPcd();
 const micSensitivityInput = document.getElementById('micSensitivity');
 const micSensitivityValue = document.getElementById('micSensitivityValue');
 const pcdControls = {

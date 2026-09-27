@@ -287,12 +287,89 @@ Object.assign(labelLayer.style, {
 });
 torusWindow.appendChild(labelLayer);
 
+const connectionInputs = {
+  notes: document.getElementById('noteConnections'),
+  chords: document.getElementById('chordConnections'),
+};
+const connectionLines = {};
+
+function updateConnectionVisibility() {
+  for (const kind of ['notes', 'chords']) {
+    if (connectionLines[kind]) {
+      connectionLines[kind].visible =
+        connectionInputs[kind].checked &&
+        (plotModeInput.value === 'both' || plotModeInput.value === kind);
+    }
+  }
+}
+connectionInputs.notes.addEventListener('change', updateConnectionVisibility);
+connectionInputs.chords.addEventListener('change', updateConnectionVisibility);
+
+function updateConnectionPositions() {
+  for (const kind of ['notes', 'chords']) {
+    const line = connectionLines[kind];
+    if (!line) continue;
+    const positions = line.geometry.attributes.position;
+    line.userData.edges.forEach(([from, to], index) => {
+      const offset = index * 6;
+      const start = line.userData.nodes[from].pos;
+      const end = line.userData.nodes[to].pos;
+      positions.array[offset] = start.x;
+      positions.array[offset + 1] = start.y;
+      positions.array[offset + 2] = start.z;
+      positions.array[offset + 3] = end.x;
+      positions.array[offset + 4] = end.y;
+      positions.array[offset + 5] = end.z;
+    });
+    positions.needsUpdate = true;
+    line.geometry.computeBoundingSphere();
+  }
+}
+
+async function loadConnections() {
+  const response = await fetch('./json/connections.json', { cache: 'no-store' });
+  if (!response.ok) throw new Error('Could not load connections.json: ' + response.status);
+  const data = await response.json();
+  for (const [kind, key, color] of [
+    ['notes', 'IntervalConnections', 0x83cde6],
+    ['chords', 'ChordConnections', 0xf0a67f],
+  ]) {
+    const nodes = plottedPoints.filter(point => point.kind === kind);
+    const pairs = data[key];
+    if (!Array.isArray(pairs) || !pairs.every(pair =>
+      Array.isArray(pair) && pair.length === 2 &&
+      pair.every(index => Number.isInteger(index) && index >= 0 && index < nodes.length)
+    )) throw new Error('Invalid ' + key + ' indices');
+    // The chord source includes each pair in both directions; render each edge once.
+    const seen = new Set();
+    const edges = pairs.filter(([from, to]) => {
+      const key = [Math.min(from, to), Math.max(from, to)].join(':');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    const geometry = new THREE.BufferGeometry();
+    const attribute = new THREE.BufferAttribute(new Float32Array(edges.length * 6), 3);
+    attribute.setUsage(THREE.DynamicDrawUsage);
+    geometry.setAttribute('position', attribute);
+    const line = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({
+      color, transparent: true, opacity: 0.55, depthWrite: false,
+    }));
+    line.userData = { nodes, edges };
+    connectionLines[kind] = line;
+    group.add(line);
+  }
+  updateConnectionPositions();
+  updateConnectionVisibility();
+}
+
 function applyPlotMode() {
   for (const point of plottedPoints) {
     const visible = plotModeInput.value === 'both' || plotModeInput.value === point.kind;
     point.marker.visible = visible;
     point.labelEl.hidden = !visible;
   }
+  updateConnectionVisibility();
 }
 plotModeInput.addEventListener('change', applyPlotMode);
 
@@ -338,6 +415,7 @@ async function loadPlotPoints() {
   }
   applyPlotMode();
   applyAccidentalMode();
+  await loadConnections();
 }
 // Settings change the geometry and the same polar positions used by every node.
 let resizeQueued = false;
@@ -355,6 +433,7 @@ function applyTorusSize() {
   }
   updateThetaSlice();
   updatePointer();
+  updateConnectionPositions();
 
   // Keep the full torus in the square viewing window at larger sizes.
   const halfFov = THREE.MathUtils.degToRad(camera.fov / 2);

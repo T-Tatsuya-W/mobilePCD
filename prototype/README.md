@@ -32,3 +32,5 @@ Standalone mobilePCD control and torus experiment. Serve the repository over HTT
 - The microphone torus marker keeps its last valid position and dims to grey when input is silent or capture stops. New valid audio brightens and moves that same marker again; torus size edits still reposition it.
 
 - Start audio arms the output, and the pointer PCD sounds only while the radar is held; releasing or losing pointer capture fades all notes out. Active note levels are scaled to the strongest selected pitch class so the default output is audible, while output volume still sets the master gain.
+
+- In the red pointer PCD display, bars and labels above the note threshold glow brightly; the other bins remain dim red. The highlights update with pointer movement and threshold changes, even when audio is not armed, so you can see which pitches would sound when holding the radar. The blue microphone PCD has no output-threshold highlights.

@@ -84,7 +84,10 @@ function drawPcd(values) {
     const value = Math.max(0, Math.min(1, values[i] || 0));
     // Normalise bar height to the strongest bin so spread-out audio remains legible.
     pcdBarEls[i].style.height = peak > 0 ? (value / peak * 100).toFixed(1) + '%' : '0%';
-    pcdBarEls[i].parentElement.title = pcdNameEls[i].textContent + ': ' + value.toFixed(3);
+    const aboveThreshold = showPointerPcd && value >= Number(noteThresholdInput.value) && value > 0;
+    pcdBarEls[i].parentElement.parentElement.classList.toggle('active-note', aboveThreshold);
+    pcdBarEls[i].parentElement.title = pcdNameEls[i].textContent + ': ' + value.toFixed(3) +
+      (aboveThreshold ? ' · above note threshold' : '');
   }
 }
 function updatePointerPcd() {
@@ -109,6 +112,7 @@ function updateAudioSettings() {
   audioOutput.setVolume(Number(outputVolumeInput.value));
   audioOutput.setOctaves(octaveInputs.filter(input => input.checked).map(input => Number(input.value)));
   noteThresholdValue.textContent = Number(noteThresholdInput.value).toFixed(2);
+  if (showPointerPcd && showPcdInput.checked) drawPcd(pointerPcd);
   outputVolumeValue.textContent = Math.round(Number(outputVolumeInput.value) * 100) + '%';
 }
 noteThresholdInput.addEventListener('input', updateAudioSettings);

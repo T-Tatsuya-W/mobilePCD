@@ -636,7 +636,8 @@ spinSpeedInput.addEventListener('input', () => {
   spinSpeedValue.textContent = Number(spinSpeedInput.value).toFixed(2) + 'π/s';
 });
 spinRangeInput.addEventListener('input', () => {
-  spinRangeValue.textContent = Number(spinRangeInput.value).toFixed(2) + 'π';
+  spinRangeValue.textContent = Number(spinRangeInput.value) >= 2.05 ? '∞' :
+    Number(spinRangeInput.value).toFixed(2) + 'π';
   resetSpinSweep();
 });
 spinDirectionButton.addEventListener('click', () => {
@@ -648,10 +649,12 @@ spinDirectionButton.addEventListener('click', () => {
 function advanceSpin(deltaSeconds) {
   const distance = Number(spinSpeedInput.value) * Math.PI * deltaSeconds;
   if (distance <= 0 || viewPointerId !== null) return;
-  const range = Number(spinRangeInput.value) * Math.PI;
-  if (range === 0) {
+  const selectedRange = Number(spinRangeInput.value);
+  if (selectedRange === 0) return;
+  if (selectedRange >= 2.05) {
     spin += spinSign * distance;
   } else {
+    const range = selectedRange * Math.PI;
     spinPhase = (spinPhase + distance) % (2 * range);
     const travel = spinPhase <= range ? spinPhase : 2 * range - spinPhase;
     spin = spinAnchor + spinSign * travel;

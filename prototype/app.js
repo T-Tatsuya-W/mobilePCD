@@ -9,11 +9,16 @@ const state = {
   thetaUnwrapped: 0,
   thetaPointerId: null,
   thetaLastY: 0,
-  thetaLastTime: 0,
   radar: { x: 0, y: 0, held: false, pointerId: null },
 };
 
 const thetaSliderPanel = document.getElementById('thetaSliderPanel');
+const micFollowInput = document.getElementById('micFollow');
+const thetaSensitivityInput = document.getElementById('thetaSensitivity');
+const thetaSensitivityValue = document.getElementById('thetaSensitivityValue');
+thetaSensitivityInput.addEventListener('input', () => {
+  thetaSensitivityValue.textContent = Number(thetaSensitivityInput.value).toFixed(2) + '×';
+});
 const thetaValueEl = document.getElementById('thetaValue');
 
 const mainPanel = document.querySelector('.main-panel');
@@ -348,29 +353,21 @@ function updateRadarUi() {
 }
 
 thetaSliderPanel.addEventListener('pointerdown', (event) => {
-  if (state.thetaPointerId !== null) return;
+  if (micFollowInput.checked || state.thetaPointerId !== null) return;
   state.thetaPointerId = event.pointerId;
   wheelPixelRemainder = 0;
   state.thetaLastY = event.clientY;
-  state.thetaLastTime = event.timeStamp;
   thetaSliderPanel.setPointerCapture(event.pointerId);
   updateThetaSlider();
 });
 
 thetaSliderPanel.addEventListener('pointermove', (event) => {
-  if (event.pointerId !== state.thetaPointerId) return;
+  if (micFollowInput.checked || event.pointerId !== state.thetaPointerId) return;
   const dy = event.clientY - state.thetaLastY;
-  const dt = Math.max(8, event.timeStamp - state.thetaLastTime);
   state.thetaLastY = event.clientY;
-  state.thetaLastTime = event.timeStamp;
-
-  // A slow drag maps directly to the visible scale: one track height spans 2π.
-  // Faster movement gains up to 2x distance, with no momentum after release.
-  const speed = Math.abs(dy) / dt; // pixels per millisecond
-  const t = Math.max(0, Math.min(1, (speed - 0.35) / 1.15));
-  const acceleration = 1 + t * t * (3 - 2 * t);
+  // Fixed drag gain: speed does not change how far the pointer travels.
   const trackHeight = Math.max(1, thetaSliderPanel.querySelector('.theta-slider-track').clientHeight);
-  const delta = -dy * 2 / trackHeight * acceleration;
+  const delta = -dy * 2 / trackHeight * Number(thetaSensitivityInput.value);
   moveTheta(delta);
 });
 
@@ -389,6 +386,7 @@ window.addEventListener('wheel', (event) => {
   const finePointer = window.matchMedia('(any-pointer: fine)').matches;
   if (!finePointer && !thetaSliderPanel.contains(event.target)) return;
   event.preventDefault();
+  if (micFollowInput.checked) return;
   if (!finePointer) {
     // Keep the original panel-only wheel behaviour on coarse-pointer devices.
     const height = Math.max(1, thetaSliderPanel.querySelector('.theta-slider-track').clientHeight);
@@ -434,6 +432,7 @@ thetaSliderPanel.addEventListener('lostpointercapture', (event) => {
 });
 
 function setRadarFromEvent(event) {
+  if (micFollowInput.checked) return;
   const rect = radarPad.getBoundingClientRect();
   const cx = rect.left + rect.width / 2;
   const cy = rect.top + rect.height / 2;
@@ -506,6 +505,32 @@ let micPending = false;
 let micPageHidden = false;
 let lastPcdTime = -Infinity;
 let liveCoordinates = null;
+
+// Convert the absolute mic phases into the selected root's display frame.
+// The ordinary UI update paths keep the slice, nearby nodes, threshold and audio in sync.
+function followMicPointer() {
+  if (!micFollowInput.checked || !liveCoordinates) return;
+  const angles = displayAngles(liveCoordinates.theta, liveCoordinates.phi);
+  const radius = Math.max(0, Math.min(1, liveCoordinates.r));
+  state.thetaValue = angles.theta / Math.PI;
+  state.thetaUnwrapped = state.thetaValue;
+  state.radar.x = radius * Math.cos(angles.phi);
+  state.radar.y = radius * Math.sin(angles.phi);
+  updateThetaSlider();
+  updateRadarUi();
+}
+micFollowInput.addEventListener('change', () => {
+  wheelPixelRemainder = 0;
+  if (micFollowInput.checked && state.thetaPointerId !== null) {
+    const pointerId = state.thetaPointerId;
+    state.thetaPointerId = null;
+    if (thetaSliderPanel.hasPointerCapture(pointerId)) {
+      thetaSliderPanel.releasePointerCapture(pointerId);
+    }
+  }
+  followMicPointer();
+  updateLiveMarker();
+});
 let micRms = 0;
 
 for (const [key, input] of Object.entries(pcdControls)) {
@@ -613,6 +638,7 @@ audioProcessor.addEventListener('analysis', ({ detail: { pcd, rms, audioTime } }
     return;
   }
   liveCoordinates = { theta: phases[5], phi: phases[3], r: amplitudes[3] };
+  followMicPointer();
   updateLiveMarker();
   liveMarker.material.color.setHex(0xffffff);
   liveMarker.material.opacity = 1;
@@ -793,7 +819,8 @@ function updateLiveMarker() {
     angles.theta, angles.phi, liveCoordinates.r,
     liveMarker.position, torusSize.major, torusSize.minor
   );
-  liveMarker.visible = true;
+  // The shared red pointer represents the mic position in follow mode.
+  liveMarker.visible = !micFollowInput.checked;
 }
 
 const pointGeometry = new THREE.SphereGeometry(0.09, 18, 14);
@@ -1008,6 +1035,7 @@ function setTorusRoot(pitchClass) {
   updateConnectionPositions();
   updateRadarNodes();
   updateLiveMarker();
+  followMicPointer();
   updatePointerPcd();
 }
 

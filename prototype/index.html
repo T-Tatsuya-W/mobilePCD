@@ -44,6 +44,8 @@
           <label for="noteConnections">Note connections <input id="noteConnections" type="checkbox" /></label>
           <label for="chordConnections">Chord connections <input id="chordConnections" type="checkbox" checked /></label>
           <h2>Theta slider settings</h2>
+          <label for="thetaSensitivity">Theta drag sensitivity <output id="thetaSensitivityValue">1.00×</output></label>
+          <input id="thetaSensitivity" type="range" min="0.25" max="3" step="0.05" value="1" />
           <div class="settings-toggle-row"><span>Marker labels</span><button id="thetaLabelMode" type="button" aria-pressed="true">Circle of fifths</button></div>
           <div class="settings-toggle-row"><span>Root at θ = 0</span><output id="rootNoteValue">C</output></div>
           <div id="rootNoteButtons" class="root-note-grid" role="group" aria-label="Torus root note"></div>
@@ -54,6 +56,8 @@
           <label for="showPcd">Show PCD <input id="showPcd" type="checkbox" checked /></label>
           <div class="settings-toggle-row"><span>Show source</span><button id="pcdSourceToggle" type="button" aria-pressed="true">Pointer PCD</button></div>
           <h2>Mic to torus settings</h2>
+          <label for="micFollow">Pointer follows mic <input id="micFollow" type="checkbox" /></label>
+          <div class="mic-status">Start the mic to track its detected position. Radar presses control audio; the last position stays through silence.</div>
           <button id="micToggle" class="mic-toggle" type="button" aria-pressed="false">Start mic</button>
           <div id="micStatus" class="mic-status" role="status" aria-live="polite">Mic off</div>
           <label for="micSensitivity">Mic light sensitivity <output id="micSensitivityValue">7.0×</output></label>
@@ -108,6 +112,6 @@
 
   </main>
 
-  <script type="module" src="./app.js?v=prototype-clean-1"></script>
+  <script type="module" src="./app.js?v=mic-follow-1"></script>
 </body>
 </html>

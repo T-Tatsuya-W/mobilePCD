@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#111318" />
   <title>mobilePCD Interaction Prototype</title>
-  <link rel="stylesheet" href="./styles.css?v=prototype-clean-1" />
+  <link rel="stylesheet" href="./styles.css?v=mic-analysis-groups-1" />
   <link rel="manifest" href="./manifest.webmanifest?v=prototype-clean-1" />
   <link rel="icon" href="./icon.svg?v=prototype-clean-1" type="image/svg+xml" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -26,69 +26,108 @@
         <span id="micIndicator" class="mic-indicator" role="img" aria-label="Microphone active" hidden></span>
         <div id="pcdStrip" class="pcd-strip" aria-label="Pointer pitch class distribution"><div id="pcdBars" class="pcd-bars"></div></div>
         <div id="torusSettings" class="torus-settings" hidden>
-          <h2>Torus geometry and nodes</h2>
-          <label for="majorRadius">Major radius <output id="majorRadiusValue">1.55</output></label>
-          <input id="majorRadius" type="range" min="0.90" max="2.20" step="0.01" value="1.55" />
-          <label for="minorRadius">Minor radius <output id="minorRadiusValue">0.68</output></label>
-          <input id="minorRadius" type="range" min="0.15" max="1.00" step="0.01" value="0.68" />
-          <h2>View rotation</h2>
-          <label for="spinSpeed">Spin speed <output id="spinSpeedValue">0.000π/s</output></label>
-          <input id="spinSpeed" type="range" min="0" max="0.25" step="0.001" value="0" />
-          <label for="spinRange">Spin range <output id="spinRangeValue">∞</output></label>
-          <input id="spinRange" type="range" min="0" max="2.05" step="0.05" value="2.05" />
-          <div class="mic-status">Range 0 holds still; the selected angle is the total sweep, centred on your current view. ∞ spins continuously.</div>
-          <div class="settings-toggle-row"><span>Spin direction</span><button id="spinDirection" type="button" aria-pressed="false">Forward ↻</button></div>
-          <label for="plotNotes">Plot notes <input id="plotNotes" type="checkbox" checked /></label>
-          <label for="plotChords">Plot chords <input id="plotChords" type="checkbox" checked /></label>
-          <div class="settings-toggle-row"><span>Note names</span><button id="accidentalMode" type="button" aria-pressed="false">Sharps (♯)</button></div>
-          <label for="noteConnections">Note connections <input id="noteConnections" type="checkbox" /></label>
-          <label for="chordConnections">Chord connections <input id="chordConnections" type="checkbox" checked /></label>
-          <h2>Theta slider settings</h2>
-          <label for="thetaSensitivity">Theta drag sensitivity <output id="thetaSensitivityValue">1.00×</output></label>
-          <input id="thetaSensitivity" type="range" min="0.25" max="3" step="0.05" value="1" />
-          <div class="settings-toggle-row"><span>Marker labels</span><button id="thetaLabelMode" type="button" aria-pressed="true">Circle of fifths</button></div>
-          <div class="settings-toggle-row"><span>Root at θ = 0</span><output id="rootNoteValue">C</output></div>
-          <div id="rootNoteButtons" class="root-note-grid" role="group" aria-label="Torus root note"></div>
-          <h2>Radar settings</h2>
-          <label for="radarRange">Radar range <output id="radarRangeValue">0.25π</output></label>
-          <input id="radarRange" type="range" min="0.01" max="0.50" step="0.01" value="0.25" />
-          <h2>PCD display</h2>
-          <label for="showPcd">Show PCD <input id="showPcd" type="checkbox" checked /></label>
-          <div class="settings-toggle-row"><span>Show source</span><button id="pcdSourceToggle" type="button" aria-pressed="true">Pointer PCD</button></div>
-          <h2>Mic to torus settings</h2>
-          <label for="micFollow">Pointer follows mic <input id="micFollow" type="checkbox" /></label>
-          <div class="mic-status">Start the mic to track its detected position. Radar presses control audio; the last position stays through silence.</div>
-          <button id="micToggle" class="mic-toggle" type="button" aria-pressed="false">Start mic</button>
-          <div id="micStatus" class="mic-status" role="status" aria-live="polite">Mic off</div>
-          <label for="micSensitivity">Mic light sensitivity <output id="micSensitivityValue">7.0×</output></label>
-          <input id="micSensitivity" type="range" min="1" max="30" step="0.5" value="7" />
-          <label for="pcdMinRms">Minimum input level <output id="pcdMinRmsValue">0.0010</output></label>
-          <input id="pcdMinRms" type="range" min="0" max="0.02" step="0.0005" value="0.001" />
-          <label for="pcdThreshold">Pitch bin threshold <output id="pcdThresholdValue">0.005</output></label>
-          <input id="pcdThreshold" type="range" min="0" max="0.1" step="0.001" value="0.005" />
-          <label for="pcdNormalize">PCD contrast <output id="pcdNormalizeValue">1.00</output></label>
-          <input id="pcdNormalize" type="range" min="0.5" max="3" step="0.05" value="1" />
-          <label for="pcdSmoothing">PCD smoothing <output id="pcdSmoothingValue">0.60</output></label>
-          <input id="pcdSmoothing" type="range" min="0" max="0.95" step="0.05" value="0.6" />
-          <label for="pcdMinHz">Low frequency <output id="pcdMinHzValue">50</output> Hz</label>
-          <input id="pcdMinHz" type="range" min="30" max="400" step="10" value="50" />
-          <label for="pcdMaxHz">High frequency <output id="pcdMaxHzValue">5000</output> Hz</label>
-          <input id="pcdMaxHz" type="range" min="1000" max="8000" step="100" value="5000" />
-          <label for="pcdRefA4">Reference A4 <output id="pcdRefA4Value">440</output> Hz</label>
-          <input id="pcdRefA4" type="range" min="430" max="450" step="1" value="440" />
-          <h2>Torus to audio settings</h2>
-          <button id="audioToggle" class="mic-toggle" type="button" aria-pressed="true">Stop audio</button>
-          <label for="notePersist">Note persist <input id="notePersist" type="checkbox" /></label>
-          <div id="audioStatus" class="mic-status" role="status" aria-live="polite">Ready · hold radar to play</div>
-          <label for="noteThresholdMin">Threshold at r = 0 <output id="noteThresholdMinValue">0.13</output></label>
-          <input id="noteThresholdMin" type="range" min="0" max="0.40" step="0.01" value="0.13" />
-          <label for="noteThresholdMax">Threshold at r = 1 <output id="noteThresholdMaxValue">0.18</output></label>
-          <input id="noteThresholdMax" type="range" min="0" max="0.40" step="0.01" value="0.18" />
-          <div class="mic-status">Current threshold: <output id="noteThresholdValue">0.13</output></div>
-          <label for="outputVolume">Output volume <output id="outputVolumeValue">25%</output></label>
-          <input id="outputVolume" type="range" min="0" max="0.50" step="0.01" value="0.25" />
-          <div class="audio-octave-heading">Octaves</div>
-          <div class="audio-octaves"><label><input class="audio-octave" type="checkbox" value="2" />2</label><label><input class="audio-octave" type="checkbox" value="3" />3</label><label><input class="audio-octave" type="checkbox" value="4" checked />4</label><label><input class="audio-octave" type="checkbox" value="5" />5</label><label><input class="audio-octave" type="checkbox" value="6" />6</label></div>
+          <details class="settings-group">
+            <summary>Torus geometry and nodes</summary>
+            <div class="settings-group-content">
+              <label for="majorRadius">Major radius <output id="majorRadiusValue">1.55</output></label>
+              <input id="majorRadius" type="range" min="0.90" max="2.20" step="0.01" value="1.55" />
+              <label for="minorRadius">Minor radius <output id="minorRadiusValue">0.68</output></label>
+              <input id="minorRadius" type="range" min="0.15" max="1.00" step="0.01" value="0.68" />
+              <label for="plotNotes">Plot notes <input id="plotNotes" type="checkbox" checked /></label>
+              <label for="plotChords">Plot chords <input id="plotChords" type="checkbox" checked /></label>
+              <div class="settings-toggle-row"><span>Note names</span><button id="accidentalMode" type="button" aria-pressed="false">Sharps (♯)</button></div>
+              <label for="noteConnections">Note connections <input id="noteConnections" type="checkbox" /></label>
+              <label for="chordConnections">Chord connections <input id="chordConnections" type="checkbox" checked /></label>
+            </div>
+          </details>
+          <details class="settings-group">
+            <summary>View rotation</summary>
+            <div class="settings-group-content">
+              <label for="spinSpeed">Spin speed <output id="spinSpeedValue">0.000π/s</output></label>
+              <input id="spinSpeed" type="range" min="0" max="0.25" step="0.001" value="0" />
+              <label for="spinRange">Spin range <output id="spinRangeValue">∞</output></label>
+              <input id="spinRange" type="range" min="0" max="2.05" step="0.05" value="2.05" />
+              <div class="mic-status">Range 0 holds still; the selected angle is the total sweep, centred on your current view. ∞ spins continuously.</div>
+              <div class="settings-toggle-row"><span>Spin direction</span><button id="spinDirection" type="button" aria-pressed="false">Forward ↻</button></div>
+            </div>
+          </details>
+          <details class="settings-group">
+            <summary>Theta slider settings</summary>
+            <div class="settings-group-content">
+              <label for="thetaSensitivity">Theta drag sensitivity <output id="thetaSensitivityValue">1.00×</output></label>
+              <input id="thetaSensitivity" type="range" min="0.25" max="3" step="0.05" value="1" />
+              <div class="settings-toggle-row"><span>Marker labels</span><button id="thetaLabelMode" type="button" aria-pressed="true">Circle of fifths</button></div>
+              <div class="settings-toggle-row"><span>Root at θ = 0</span><output id="rootNoteValue">C</output></div>
+              <div id="rootNoteButtons" class="root-note-grid" role="group" aria-label="Torus root note"></div>
+            </div>
+          </details>
+          <details class="settings-group">
+            <summary>Radar settings</summary>
+            <div class="settings-group-content">
+              <label for="radarRange">Radar range <output id="radarRangeValue">0.25π</output></label>
+              <input id="radarRange" type="range" min="0.01" max="0.50" step="0.01" value="0.25" />
+            </div>
+          </details>
+          <details class="settings-group">
+            <summary>PCD display</summary>
+            <div class="settings-group-content">
+              <label for="showPcd">Show PCD <input id="showPcd" type="checkbox" checked /></label>
+              <div class="settings-toggle-row"><span>Show source</span><button id="pcdSourceToggle" type="button" aria-pressed="true">Pointer PCD</button></div>
+            </div>
+          </details>
+          <details class="settings-group">
+            <summary>Mic to torus settings</summary>
+            <div class="settings-group-content">
+              <label for="micFollow">Pointer follows mic <input id="micFollow" type="checkbox" /></label>
+              <div class="mic-status">Start the mic to track its detected position. Radar presses control audio; the last position stays through silence.</div>
+              <button id="micToggle" class="mic-toggle" type="button" aria-pressed="false">Start mic</button>
+              <div id="micStatus" class="mic-status" role="status" aria-live="polite">Mic off</div>
+              <label for="micSensitivity">Mic light sensitivity <output id="micSensitivityValue">7.0×</output></label>
+              <input id="micSensitivity" type="range" min="1" max="30" step="0.5" value="7" />
+            </div>
+          </details>
+          <details class="settings-group">
+            <summary>Mic analysis</summary>
+            <div class="settings-group-content">
+              <label for="micWindowSize">Analysis window <output id="micWindowSizeValue">8192 samples</output></label>
+              <input id="micWindowSize" type="range" min="10" max="15" step="1" value="13" />
+              <div class="mic-status">Larger windows distinguish nearby pitches better, but react more slowly.</div>
+              <label for="micHopSize">Analysis hop <output id="micHopSizeValue">2048 samples</output></label>
+              <input id="micHopSize" type="range" min="7" max="13" step="1" value="11" />
+              <div class="mic-status">Smaller hops update more often and use more processing. Displayed durations use the mic’s sample rate.</div>
+              <label for="pcdMinRms">Minimum input level <output id="pcdMinRmsValue">0.0010</output></label>
+              <input id="pcdMinRms" type="range" min="0" max="0.02" step="0.0005" value="0.001" />
+              <label for="pcdThreshold">Pitch bin threshold <output id="pcdThresholdValue">0.005</output></label>
+              <input id="pcdThreshold" type="range" min="0" max="0.1" step="0.001" value="0.005" />
+              <label for="pcdNormalize">PCD contrast <output id="pcdNormalizeValue">1.00</output></label>
+              <input id="pcdNormalize" type="range" min="0.5" max="3" step="0.05" value="1" />
+              <label for="pcdSmoothing">PCD smoothing <output id="pcdSmoothingValue">0.60</output></label>
+              <input id="pcdSmoothing" type="range" min="0" max="0.95" step="0.05" value="0.6" />
+              <label for="pcdMinHz">Low frequency <output id="pcdMinHzValue">50</output> Hz</label>
+              <input id="pcdMinHz" type="range" min="30" max="400" step="10" value="50" />
+              <label for="pcdMaxHz">High frequency <output id="pcdMaxHzValue">5000</output> Hz</label>
+              <input id="pcdMaxHz" type="range" min="1000" max="8000" step="100" value="5000" />
+              <label for="pcdRefA4">Reference A4 <output id="pcdRefA4Value">440</output> Hz</label>
+              <input id="pcdRefA4" type="range" min="430" max="450" step="1" value="440" />
+            </div>
+          </details>
+          <details class="settings-group">
+            <summary>Torus to audio settings</summary>
+            <div class="settings-group-content">
+              <button id="audioToggle" class="mic-toggle" type="button" aria-pressed="true">Stop audio</button>
+              <label for="notePersist">Note persist <input id="notePersist" type="checkbox" /></label>
+              <div id="audioStatus" class="mic-status" role="status" aria-live="polite">Ready · hold radar to play</div>
+              <label for="noteThresholdMin">Threshold at r = 0 <output id="noteThresholdMinValue">0.13</output></label>
+              <input id="noteThresholdMin" type="range" min="0" max="0.40" step="0.01" value="0.13" />
+              <label for="noteThresholdMax">Threshold at r = 1 <output id="noteThresholdMaxValue">0.18</output></label>
+              <input id="noteThresholdMax" type="range" min="0" max="0.40" step="0.01" value="0.18" />
+              <div class="mic-status">Current threshold: <output id="noteThresholdValue">0.13</output></div>
+              <label for="outputVolume">Output volume <output id="outputVolumeValue">25%</output></label>
+              <input id="outputVolume" type="range" min="0" max="0.50" step="0.01" value="0.25" />
+              <div class="audio-octave-heading">Octaves</div>
+              <div class="audio-octaves"><label><input class="audio-octave" type="checkbox" value="2" />2</label><label><input class="audio-octave" type="checkbox" value="3" />3</label><label><input class="audio-octave" type="checkbox" value="4" checked />4</label><label><input class="audio-octave" type="checkbox" value="5" />5</label><label><input class="audio-octave" type="checkbox" value="6" />6</label></div>
+            </div>
+          </details>
         </div>
       </section>
 
@@ -112,6 +151,6 @@
 
   </main>
 
-  <script type="module" src="./app.js?v=mic-follow-1"></script>
+  <script type="module" src="./app.js?v=mic-analysis-groups-1"></script>
 </body>
 </html>

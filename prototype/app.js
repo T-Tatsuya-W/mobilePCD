@@ -62,13 +62,19 @@ let noteLatched = false;
 function shouldPlayAudio() {
   return audioEnabled && (state.radar.held || (notePersistInput.checked && noteLatched));
 }
+function holdReleasedPcd() {
+  return !micFollowInput.checked && notePersistInput.checked && noteLatched &&
+    !state.radar.held && audioOutput.isRunning();
+}
 function updateAudioStatus() {
   if (!audioOutput.isRunning()) return;
   audioStatus.textContent = state.radar.held ? 'Playing pointer PCD' :
-    notePersistInput.checked && noteLatched ? 'Holding last note' : 'Ready · hold radar to play';
+    notePersistInput.checked && noteLatched ?
+      (micFollowInput.checked ? 'Playing mic-follow pointer PCD' : 'Holding last note') :
+      'Ready · hold radar to play';
 }
 function displayedPointerPcd() {
-  return notePersistInput.checked && noteLatched && !state.radar.held && audioOutput.isRunning()
+  return holdReleasedPcd()
     ? audioOutput.pcd : pointerPcd;
 }
 const noteThresholdMinInput = document.getElementById('noteThresholdMin');
@@ -194,8 +200,8 @@ function updatePointerPcd() {
     sum += pointerPcd[i];
   }
   if (sum > 0) for (let i = 0; i < 12; i++) pointerPcd[i] /= sum;
-  // Keep the last played PCD when the radar is released in persist mode.
-  if (state.radar.held || !notePersistInput.checked || !noteLatched || !audioOutput.isRunning()) {
+  // Persist freezes a released manual selection; mic-follow continues retuning.
+  if (!holdReleasedPcd()) {
     audioOutput.update(pointerPcd);
   }
   if (showPointerPcd && showPcdInput.checked) drawPcd(displayedPointerPcd());
@@ -280,6 +286,7 @@ audioToggle.addEventListener('click', async () => {
   }
 });
 notePersistInput.addEventListener('change', () => {
+  updatePointerPcd();
   audioOutput.setHeld(shouldPlayAudio());
   if (showPointerPcd && showPcdInput.checked) drawPcd(displayedPointerPcd());
   updateAudioStatus();
@@ -530,6 +537,8 @@ micFollowInput.addEventListener('change', () => {
   }
   followMicPointer();
   updateLiveMarker();
+  updatePointerPcd();
+  updateAudioStatus();
 });
 let micRms = 0;
 
@@ -559,6 +568,7 @@ micWindowSizeInput.addEventListener('input', updateAnalysisSizes);
 micHopSizeInput.addEventListener('input', updateAnalysisSizes);
 audioProcessor.addEventListener('statechange', updateAnalysisSizeLabels);
 updateAnalysisSizes();
+
 
 
 for (const [key, input] of Object.entries(pcdControls)) {

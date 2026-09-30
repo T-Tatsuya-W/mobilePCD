@@ -20,3 +20,9 @@ The prototype keeps its application code, audio processing, note/chord data, sty
 - `audio/` contains the microphone FFT/PCD pipeline and the separate polyphonic output synthesizer.
 - `pcd-dft.js` and `json/` provide the local transformation code and note, chord, and connection data.
 - `icon.svg`, `icon-192.png`, and `icon-512.png` share the torus, connections, and pointer artwork used by the page and installed app.
+
+## Mic analysis settings
+
+Settings groups collapse independently; opening one does not close another or change its values. Plot visibility and connections are grouped with torus geometry, separate from view rotation. Mic controls and Mic analysis have separate headings.
+
+Analysis window is adjustable in powers of two from 1024 to 32768 samples (default 8192). Larger windows improve FFT frequency resolution at the cost of temporal response. Analysis hop is adjustable from 128 samples up to the current window size (default 2048); smaller hops increase update frequency and CPU work. The controls display durations using the active microphone sample rate (48 kHz estimate before capture starts). A window change replaces and resets the bounded analysis buffers without restarting capture; no audio history accumulates. The other available analysis parameters—input level, pitch bin threshold, contrast, smoothing, frequency limits and reference A4—remain adjustable. Torus visual updates remain capped at 20 Hz.

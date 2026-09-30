@@ -542,6 +542,35 @@ micFollowInput.addEventListener('change', () => {
 });
 let micRms = 0;
 
+const micWindowSizeInput = document.getElementById('micWindowSize');
+const micHopSizeInput = document.getElementById('micHopSize');
+const micWindowSizeValue = document.getElementById('micWindowSizeValue');
+const micHopSizeValue = document.getElementById('micHopSizeValue');
+
+function updateAnalysisSizeLabels() {
+  const sampleRate = audioProcessor.getSampleRate();
+  const describe = (samples) => samples + ' samples · ' +
+    (1000 * samples / sampleRate).toFixed(1) + ' ms';
+  micWindowSizeValue.textContent = describe(audioProcessor.config.windowSize);
+  micHopSizeValue.textContent = describe(audioProcessor.config.hopSize);
+  micWindowSizeInput.setAttribute('aria-valuetext', micWindowSizeValue.textContent);
+  micHopSizeInput.setAttribute('aria-valuetext', micHopSizeValue.textContent);
+}
+function updateAnalysisSizes() {
+  const windowSize = 2 ** Number(micWindowSizeInput.value);
+  micHopSizeInput.max = micWindowSizeInput.value;
+  const hopSize = Math.min(windowSize, 2 ** Number(micHopSizeInput.value));
+  micHopSizeInput.value = String(Math.log2(hopSize));
+  audioProcessor.updateConfig({ windowSize, hopSize });
+  updateAnalysisSizeLabels();
+}
+micWindowSizeInput.addEventListener('input', updateAnalysisSizes);
+micHopSizeInput.addEventListener('input', updateAnalysisSizes);
+audioProcessor.addEventListener('statechange', updateAnalysisSizeLabels);
+updateAnalysisSizes();
+
+
+
 for (const [key, input] of Object.entries(pcdControls)) {
   const output = document.getElementById(input.id + 'Value');
   const update = () => {

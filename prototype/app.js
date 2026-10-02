@@ -676,6 +676,7 @@ audioProcessor.addEventListener('analysis', ({ detail: { pcd, rms, audioTime } }
     return;
   }
   liveCoordinates = { theta: phases[5], phi: phases[3], r: amplitudes[3] };
+  recordMicTrace(liveCoordinates, performance.now() / 1000);
   followMicPointer();
   updateLiveMarker();
   liveMarker.material.color.setHex(0xffffff);
@@ -860,6 +861,105 @@ function updateLiveMarker() {
   // The shared red pointer represents the mic position in follow mode.
   liveMarker.visible = !micFollowInput.checked;
 }
+
+
+// Bounded mic history: 15 seconds at the existing maximum of 20 points/second.
+const MIC_TRACE_CAPACITY = 320;
+const micTraceInput = document.getElementById('micTrace');
+const micTraceLengthInput = document.getElementById('micTraceLength');
+const micTraceLengthValue = document.getElementById('micTraceLengthValue');
+const micTraceHistory = new Float64Array(MIC_TRACE_CAPACITY * 4);
+let micTraceHead = 0;
+let micTraceCount = 0;
+const micTracePositions = new Float32Array((MIC_TRACE_CAPACITY - 1) * 6);
+const micTraceAlphas = new Float32Array((MIC_TRACE_CAPACITY - 1) * 2);
+const micTraceGeometry = new THREE.BufferGeometry();
+const micTracePositionAttribute = new THREE.BufferAttribute(micTracePositions, 3);
+const micTraceAlphaAttribute = new THREE.BufferAttribute(micTraceAlphas, 1);
+micTracePositionAttribute.setUsage(THREE.DynamicDrawUsage);
+micTraceAlphaAttribute.setUsage(THREE.DynamicDrawUsage);
+micTraceGeometry.setAttribute('position', micTracePositionAttribute);
+micTraceGeometry.setAttribute('traceAlpha', micTraceAlphaAttribute);
+micTraceGeometry.setDrawRange(0, 0);
+const micTrace = new THREE.LineSegments(micTraceGeometry, new THREE.ShaderMaterial({
+  transparent: true,
+  depthWrite: false,
+  depthTest: false,
+  vertexShader: `
+    attribute float traceAlpha;
+    varying float vAlpha;
+    void main() {
+      vAlpha = traceAlpha;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    varying float vAlpha;
+    void main() { gl_FragColor = vec4(0.40, 0.79, 0.93, vAlpha); }
+  `,
+}));
+micTrace.frustumCulled = false;
+micTrace.renderOrder = 2;
+group.add(micTrace);
+const micTracePoint = { x: 0, y: 0, z: 0 };
+
+function recordMicTrace(coordinates, now) {
+  if (!micTraceInput.checked) return;
+  const index = micTraceHead * 4;
+  micTraceHistory[index] = coordinates.theta;
+  micTraceHistory[index + 1] = coordinates.phi;
+  micTraceHistory[index + 2] = coordinates.r;
+  micTraceHistory[index + 3] = now;
+  micTraceHead = (micTraceHead + 1) % MIC_TRACE_CAPACITY;
+  micTraceCount = Math.min(MIC_TRACE_CAPACITY, micTraceCount + 1);
+}
+function updateMicTrace(now) {
+  micTrace.visible = micTraceInput.checked;
+  if (!micTrace.visible) return;
+  const duration = Number(micTraceLengthInput.value);
+  let oldest = (micTraceHead - micTraceCount + MIC_TRACE_CAPACITY) % MIC_TRACE_CAPACITY;
+  while (micTraceCount && now - micTraceHistory[oldest * 4 + 3] >= duration) {
+    micTraceCount--;
+    oldest = (oldest + 1) % MIC_TRACE_CAPACITY;
+  }
+  let vertices = 0;
+  let lastX = 0, lastY = 0, lastZ = 0, lastTime = 0, lastAlpha = 0;
+  for (let i = 0; i < micTraceCount; i++) {
+    const index = ((oldest + i) % MIC_TRACE_CAPACITY) * 4;
+    const time = micTraceHistory[index + 3];
+    const theta = wrapAngle(micTraceHistory[index] - rootThetaOffset);
+    const phi = wrapAngle(micTraceHistory[index + 1] - rootPhiOffset);
+    toroidalToCartesian(theta, phi, micTraceHistory[index + 2],
+      micTracePoint, torusSize.major, torusSize.minor);
+    const alpha = Math.max(0, 1 - (now - time) / duration) ** 2;
+    // Leave a break after silence or an interrupted capture rather than joining distant sessions.
+    if (i > 0 && time - lastTime <= 0.15) {
+      let offset = vertices * 3;
+      micTracePositions[offset++] = lastX;
+      micTracePositions[offset++] = lastY;
+      micTracePositions[offset++] = lastZ;
+      micTracePositions[offset++] = micTracePoint.x;
+      micTracePositions[offset++] = micTracePoint.y;
+      micTracePositions[offset] = micTracePoint.z;
+      micTraceAlphas[vertices++] = lastAlpha;
+      micTraceAlphas[vertices++] = alpha;
+    }
+    lastX = micTracePoint.x; lastY = micTracePoint.y; lastZ = micTracePoint.z;
+    lastTime = time; lastAlpha = alpha;
+  }
+  micTraceGeometry.setDrawRange(0, vertices);
+  micTracePositionAttribute.needsUpdate = true;
+  micTraceAlphaAttribute.needsUpdate = true;
+}
+micTraceInput.addEventListener('change', () => {
+  micTraceHead = 0;
+  micTraceCount = 0;
+  micTraceGeometry.setDrawRange(0, 0);
+  micTrace.visible = micTraceInput.checked;
+});
+micTraceLengthInput.addEventListener('input', () => {
+  micTraceLengthValue.textContent = Number(micTraceLengthInput.value).toFixed(1) + ' s';
+});
 
 const pointGeometry = new THREE.SphereGeometry(0.09, 18, 14);
 const plottedPoints = [];
@@ -1195,6 +1295,7 @@ function animate(timestamp) {
   group.rotation.z = spin;
   tiltGroup.updateMatrixWorld(true);
 
+  updateMicTrace(timestamp / 1000);
   renderer.render(scene, camera);
   updateLabels();
   requestAnimationFrame(animate);

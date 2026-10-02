@@ -82,6 +82,9 @@
               <div class="mic-status">Start the mic to track its detected position. Radar presses control audio; the last position stays through silence.</div>
               <button id="micToggle" class="mic-toggle" type="button" aria-pressed="false">Start mic</button>
               <div id="micStatus" class="mic-status" role="status" aria-live="polite">Mic off</div>
+              <label for="micTrace">Show mic trace <input id="micTrace" type="checkbox" /></label>
+              <label for="micTraceLength">Trace length <output id="micTraceLengthValue">4.0 s</output></label>
+              <input id="micTraceLength" type="range" min="0.5" max="15" step="0.5" value="4" />
               <label for="micSensitivity">Mic light sensitivity <output id="micSensitivityValue">7.0×</output></label>
               <input id="micSensitivity" type="range" min="1" max="30" step="0.5" value="7" />
             </div>
@@ -151,6 +154,6 @@
 
   </main>
 
-  <script type="module" src="./app.js?v=mic-analysis-persist-2"></script>
+  <script type="module" src="./app.js?v=mic-trace-1"></script>
 </body>
 </html>

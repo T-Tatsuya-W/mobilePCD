@@ -872,14 +872,19 @@ const micTraceHistory = new Float64Array(MIC_TRACE_CAPACITY * 4);
 let micTraceHead = 0;
 let micTraceCount = 0;
 const micTracePositions = new Float32Array((MIC_TRACE_CAPACITY - 1) * 6);
+const micTraceColors = new Float32Array((MIC_TRACE_CAPACITY - 1) * 6);
+const micTraceColor = new THREE.Color();
 const micTraceAlphas = new Float32Array((MIC_TRACE_CAPACITY - 1) * 2);
 const micTraceGeometry = new THREE.BufferGeometry();
 const micTracePositionAttribute = new THREE.BufferAttribute(micTracePositions, 3);
+const micTraceColorAttribute = new THREE.BufferAttribute(micTraceColors, 3);
 const micTraceAlphaAttribute = new THREE.BufferAttribute(micTraceAlphas, 1);
 micTracePositionAttribute.setUsage(THREE.DynamicDrawUsage);
 micTraceAlphaAttribute.setUsage(THREE.DynamicDrawUsage);
+micTraceColorAttribute.setUsage(THREE.DynamicDrawUsage);
 micTraceGeometry.setAttribute('position', micTracePositionAttribute);
 micTraceGeometry.setAttribute('traceAlpha', micTraceAlphaAttribute);
+micTraceGeometry.setAttribute('traceColor', micTraceColorAttribute);
 micTraceGeometry.setDrawRange(0, 0);
 const micTrace = new THREE.LineSegments(micTraceGeometry, new THREE.ShaderMaterial({
   transparent: true,
@@ -887,15 +892,19 @@ const micTrace = new THREE.LineSegments(micTraceGeometry, new THREE.ShaderMateri
   depthTest: false,
   vertexShader: `
     attribute float traceAlpha;
+    attribute vec3 traceColor;
+    varying vec3 vColor;
     varying float vAlpha;
     void main() {
       vAlpha = traceAlpha;
+      vColor = traceColor;
       gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
     }
   `,
   fragmentShader: `
     varying float vAlpha;
-    void main() { gl_FragColor = vec4(0.40, 0.79, 0.93, vAlpha); }
+    varying vec3 vColor;
+    void main() { gl_FragColor = vec4(vColor, vAlpha); }
   `,
 }));
 micTrace.frustumCulled = false;
@@ -941,6 +950,15 @@ function updateMicTrace(now) {
       micTracePositions[offset++] = micTracePoint.x;
       micTracePositions[offset++] = micTracePoint.y;
       micTracePositions[offset] = micTracePoint.z;
+      // Use the newer endpoint's displayed theta, matching the reference nodes.
+      const hue = ((theta + Math.PI) / (2 * Math.PI) + 1) % 1;
+      micTraceColor.setHSL(hue, 0.85, 0.6);
+      for (let endpoint = 0; endpoint < 2; endpoint++) {
+        const colorOffset = (vertices + endpoint) * 3;
+        micTraceColors[colorOffset] = micTraceColor.r;
+        micTraceColors[colorOffset + 1] = micTraceColor.g;
+        micTraceColors[colorOffset + 2] = micTraceColor.b;
+      }
       micTraceAlphas[vertices++] = lastAlpha;
       micTraceAlphas[vertices++] = alpha;
     }
@@ -950,6 +968,7 @@ function updateMicTrace(now) {
   micTraceGeometry.setDrawRange(0, vertices);
   micTracePositionAttribute.needsUpdate = true;
   micTraceAlphaAttribute.needsUpdate = true;
+  micTraceColorAttribute.needsUpdate = true;
 }
 micTraceInput.addEventListener('change', () => {
   micTraceHead = 0;
